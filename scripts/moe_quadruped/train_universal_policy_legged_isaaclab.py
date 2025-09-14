@@ -6,29 +6,28 @@ to learn latent task representations that can be used by a universal policy.
 """
 
 # 0 Imports and Inits
-
-from legged_gym import LEGGED_GYM_ROOT_DIR
 import os, sys, torch, json, datetime, matplotlib
 import numpy as np
 matplotlib.use('Agg')  # Use non-interactive backend
 
 # Handle NumPy compatibility for older versions
-if not hasattr(np, 'float'):
-    np.float = float
-if not hasattr(np, 'int'):
-    np.int = int
+#if not hasattr(np, 'float'):
+#    np.float = float
+#if not hasattr(np, 'int'):
+#    np.int = int
 
-# import legged_gym tasks and helper functions
-from legged_gym.envs import *
-from legged_gym.utils import get_args, export_policy_as_jit, task_registry, Logger
-from legged_gym.scripts.universal_policy_config import UniversalpolicyCfg
+
+from legged_gym.utils import get_args
+from tasks.flat.flat_go2 import Go2FlatEnvCfg, Go2FlatPPORunnerCfg
+from isaaclab.envs import ManagerBasedRLEnv
+from isaaclab.envs.rsl_rl import RslRlOnPolicyRunner
 
 # Import project-specific modules
 from MELTS.tigr.task_inference.prediction_networks import DecoderMDP
 from MELTS.tigr.task_inference.dpmm_bnp import BNPModel
 from MELTS.tigr.task_inference.dpmm_inference import DecoupledEncoder
 from MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
-from universal_policy_utils import MinimalReplayBuffer, LatentInjectedEnvWrapper, class_to_dict, TrajectoryCollector
+from universal_policy_utils import *
 
 
 # main method to train DPMM-VAE and PPO
@@ -62,10 +61,23 @@ def train_multi_task_encoder(args):
         json.dump(config_dict, f, indent=2)
     
     # Initialize Environment and Policy
-    env, _ = task_registry.make_env(name="go2_universal_melts", args=args)
-    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name="go2_universal", args=args)
+    #env, _ = task_registry.make_env(name="go2_universal_melts", args=args)
+    #ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name="go2_universal", args=args)
+    #policy = ppo_runner.get_inference_policy(device=env.device)
+    #task_ids = env.task_ids
+
+    # Create environment
+    env_cfg = Go2FlatEnvCfg()
+    env = ManagerBasedRLEnv(env_cfg)
+
+    # Create PPO runner
+    runner_cfg = Go2FlatPPORunnerCfg()
+    ppo_runner = RslRlOnPolicyRunner(env, runner_cfg)
+
+    # Extract policy and task ids
     policy = ppo_runner.get_inference_policy(device=env.device)
-    task_ids = env.task_ids
+    task_ids = env_cfg.task_ids if hasattr(env_cfg, "task_ids") else torch.zeros(env.num_envs, dtype=torch.long)
+
 
     # Initialize trajectory collector
     collector = TrajectoryCollector(traj_length=universal_cfg.TRAJECTORY_LENGTH, buffer_size=universal_cfg.MAX_BUFFER_SIZE)
@@ -150,14 +162,16 @@ def train_multi_task_encoder(args):
             selected_envs.append(env_ids)
 
         # Task 4: terrain subtypes
-        for terrain_type in range(5):
-            matching = torch.where((task_ids == 4) & (env.terrain_types == terrain_type))[0]
-
-            # check: only include terrain task if it has at least n running envs
-            if len(matching) >= universal_cfg.trajs_collect_per_subterrain_init:
-                selected_envs.append(matching[:universal_cfg.trajs_collect_per_subterrain_init])
-            else:
-                print(f"[INIT] Skipping terrain subtype {terrain_type} due to insufficient envs")
+        if hasattr(env.scene.terrain, "terrain_types"):
+            terrain_types = env.scene.terrain.terrain_types.to(env.device)
+            for terrain_type in range(5):
+                matching = torch.where((task_ids == 4) & (terrain_types == terrain_type))[0]
+                if len(matching) >= universal_cfg.trajs_collect_per_subterrain_init:
+                    selected_envs.append(matching[:universal_cfg.trajs_collect_per_subterrain_init])
+                else:
+                    print(f"[INIT] Skipping terrain subtype {terrain_type} due to insufficient envs")
+        else:
+            print("[INIT] No terrain subtypes available in current env config.")
 
     elif num_tasks == 2:
         # For 2-task configuration
