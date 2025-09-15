@@ -142,7 +142,7 @@ class GoalTrackingRewardsCfg(RewardsCfg):
 
     goal_heading = RewTerm(
         func=goal_heading_error,
-        weight=1.0,  # stronger than before
+        weight=1.5,  # stronger than before
     )
 
     move_forward = RewTerm(
@@ -152,7 +152,7 @@ class GoalTrackingRewardsCfg(RewardsCfg):
 
     upright = RewTerm(
         func=upright_penalty,
-        weight=0.5,
+        weight=1.5,
     )
 
 
