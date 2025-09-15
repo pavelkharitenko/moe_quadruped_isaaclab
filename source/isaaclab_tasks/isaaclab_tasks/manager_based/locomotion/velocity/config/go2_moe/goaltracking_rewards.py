@@ -9,6 +9,41 @@ from isaaclab.sensors import ContactSensor
 from isaaclab.envs import ManagerBasedRLEnv
 
 
+# goaltracking_rewards.py
+import torch
+from isaaclab.assets import RigidObject
+from isaaclab.envs import ManagerBasedRLEnv
+from isaaclab.managers import SceneEntityCfg
+
+
+def goal_distance_exp(
+    env: ManagerBasedRLEnv,
+    std: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward for minimizing distance to a goal position in XY."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    # Current robot position (XY only)
+    pos_xy = asset.data.root_pos_w[:, :2]
+    # Goal position stored in env.extras["goal_xy"]
+    goal_xy = env.extras["goal_xy"].to(env.device)
+    dist = torch.linalg.norm(pos_xy - goal_xy, dim=1)
+    return torch.exp(-dist**2 / (2 * std**2))
+
+
+def goal_heading_error(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalty for deviating from desired heading at the goal."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    # Current base yaw from quaternion
+    yaw = asset.data.root_quat_w[:, [0, 3]]  # simplified yaw extraction
+    # Desired yaw (stored in env.extras["goal_yaw"])
+    goal_yaw = env.extras["goal_yaw"].to(env.device)
+    return -torch.abs(yaw[:, 0] - goal_yaw)  # simple abs error, could wrap to [-pi, pi]
+
+
 def goal_distance(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),

@@ -84,7 +84,7 @@ class UnitreeGo2GoalTrackingEnvCfg(UnitreeGo2FlatEnvCfg):
         self.commands.base_velocity = None
 
         # replace observation term to expose new goal_position instead
-        self.observations.policy.
+        #self.observations.policy.
         commands.params["command_name"] = "goal_position"
 
         # disable default locomotion rewards

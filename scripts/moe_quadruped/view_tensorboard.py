@@ -129,5 +129,5 @@ if __name__ == "__main__":
     event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-10_07-51-07_run06\events.out.tfevents.1757483479.ASUSROG16.44592.0"
     
     # Current goaltracking policy
-    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-14_13-39-10_run08\events.out.tfevents.1757849959.ASUSROG16.6748.0"
+    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-14_16-14-56_run09\events.out.tfevents.1757866511.lrz-server1.67214.0"
     analyze_tfevents(event_file)
