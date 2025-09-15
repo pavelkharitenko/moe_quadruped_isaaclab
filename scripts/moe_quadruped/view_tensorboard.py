@@ -124,10 +124,10 @@ def analyze_tfevents(event_file: str):
 if __name__ == "__main__":
     # replace with your actual tfevents path
     # Current flat policy
-    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-08_07-45-14_run03\events.out.tfevents.1757310325.ASUSROG16.35732.0"
+    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-08_07-45-14_run03\events.out.tfevents.1757310325.ASUSROG16.35732.0"
     # Current legstand policy
-    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-10_07-51-07_run06\events.out.tfevents.1757483479.ASUSROG16.44592.0"
+    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-10_07-51-07_run06\events.out.tfevents.1757483479.ASUSROG16.44592.0"
     
     # Current goaltracking policy
-    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-14_16-14-56_run09\events.out.tfevents.1757866511.lrz-server1.67214.0"
+    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-14_16-14-56_run09\events.out.tfevents.1757866511.lrz-server1.67214.0"
     analyze_tfevents(event_file)

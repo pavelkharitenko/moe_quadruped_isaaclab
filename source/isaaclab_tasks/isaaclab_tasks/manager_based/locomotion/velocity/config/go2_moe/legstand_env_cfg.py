@@ -4,15 +4,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from isaaclab.utils import configclass
-from .flat_env_cfg import UnitreeGo2FlatEnvCfg
-from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
-from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import RewardsCfg
 from .legstand_rewards import *
+from isaaclab.managers import RewardTermCfg as RewTerm
 import math
 
-
-
+from .flat_env_cfg import UnitreeGo2FlatEnvCfg
+from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import RewardsCfg
 
 
 @configclass
@@ -49,12 +47,11 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base"])},
     )
 
-
-
 @configclass
 class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
 
-    rewards: UnitreeGo2LegStandRewardsCfg = UnitreeGo2LegStandRewardsCfg() # add custom rewards
+    # add custom rewards
+    rewards: UnitreeGo2LegStandRewardsCfg = UnitreeGo2LegStandRewardsCfg() 
 
     def __post_init__(self):
         # post init of parent

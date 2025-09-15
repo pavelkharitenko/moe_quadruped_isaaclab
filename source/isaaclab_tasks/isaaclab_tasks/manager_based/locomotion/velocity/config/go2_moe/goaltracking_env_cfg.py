@@ -36,57 +36,87 @@ def goal_heading_error(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Penalty for deviating from desired yaw at the goal."""
+    """Reward for aligning robot's heading with the goal direction."""
     asset: RigidObject = env.scene[asset_cfg.name]
 
-    # Extract yaw from quaternion (simplified)
-    qw, qz = asset.data.root_quat_w[:, 0], asset.data.root_quat_w[:, 3]
-    yaw = 2 * torch.atan2(qz, qw)
+    # Compute forward vector in XY plane
+    # Assuming local X-axis is forward
+    quat = asset.data.root_quat_w  # [w, x, y, z]
+    qw, qx, qy, qz = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
 
-    goal_yaw = env.extras["goal_yaw"].to(env.device)
-    yaw_error = torch.remainder(yaw - goal_yaw + math.pi, 2 * math.pi) - math.pi
-    return -torch.abs(yaw_error)
+    # Forward vector in world frame
+    forward_x = 2 * (qx*qz + qw*qy)
+    forward_y = 2 * (qy*qz - qw*qx)
+    forward_vec = torch.stack([forward_x, forward_y], dim=1)
+    forward_vec = torch.nn.functional.normalize(forward_vec, dim=1)
+
+    pos_xy = asset.data.root_pos_w[:, :2]
+    goal_xy = env.extras["goal_xy"].to(env.device)
+    goal_dir = torch.nn.functional.normalize(goal_xy - pos_xy, dim=1)
+
+    heading_alignment = torch.sum(forward_vec * goal_dir, dim=1)  # cos(theta)
+    return heading_alignment  # +1 = perfect alignment, -1 = opposite
+
+
+def forward_toward_goal(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward for moving toward the goal (velocity alignment)."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    pos_xy = asset.data.root_pos_w[:, :2]
+    vel_xy = asset.data.root_vel_w[:, :2]
+    goal_xy = env.extras["goal_xy"].to(env.device)
+    direction = torch.nn.functional.normalize(goal_xy - pos_xy, dim=1)
+    return torch.sum(vel_xy * direction, dim=1)  # reward for velocity toward goal
+
+
+def upright_penalty(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalty for excessive roll or pitch to discourage rolling."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    quat = asset.data.root_quat_w
+    qw, qx, qy, qz = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
+
+    # Compute roll and pitch
+    roll = torch.atan2(2*(qw*qx + qy*qz), 1 - 2*(qx**2 + qy**2))
+    pitch = torch.asin(torch.clamp(2*(qw*qy - qz*qx), -1.0, 1.0))
+    return - (torch.abs(roll) + torch.abs(pitch))  # negative = penalty
 
 
 # ----------------------------
 # Goal sampling event
 # ----------------------------
 
-def sample_new_goal(env: ManagerBasedRLEnv, assetcfg) -> None:
-    """Samples a new XY + yaw goal and stores it in env.extras."""
+def sample_new_goal(env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor | None,
+    asset_cfg: SceneEntityCfg) -> None:
+    """Samples a new XY goal and sets goal_yaw toward the goal direction."""
     num_envs = env.scene.num_envs
     device = env.device
 
-    goal_xy = (torch.rand((num_envs, 2), device=device) * 6.0) - 3.0  # [-3, 3] range
-    goal_yaw = (torch.rand((num_envs,), device=device) * 2 * math.pi) - math.pi
+    # Sample random XY goal within [-3, 3] range
+    goal_xy = (torch.rand((num_envs, 2), device=device) * 6.0) - 3.0
 
+    # Use asset_cfg.name to access robot
+    asset: RigidObject = env.scene[asset_cfg.name]
+    pos_xy = asset.data.root_pos_w[:, :2]
+
+    # Compute yaw toward goal
+    goal_dir = goal_xy - pos_xy
+    goal_yaw = torch.atan2(goal_dir[:, 1], goal_dir[:, 0])
+
+    # Store in env.extras
     env.extras["goal_xy"] = goal_xy
     env.extras["goal_yaw"] = goal_yaw
-
-    print("##############################################################")
-    print("New sampled goal", goal_xy)
 
 
 # ----------------------------
 # Configs
 # ----------------------------
 
-@configclass
-class GoalTrackingRewardsCfg(RewardsCfg):
-    """Custom rewards for goal tracking."""
-
-    # Add distance-to-goal reward
-    goal_distance = RewTerm(
-        func=goal_distance_exp,
-        weight=2.0,
-        params={"std": 1.0},
-    )
-
-    # Add heading alignment reward
-    goal_heading = RewTerm(
-        func=goal_heading_error,
-        weight=0.5,
-    )
 
 
 @configclass
@@ -95,7 +125,36 @@ class GoalTrackingEventsCfg(EventCfg):
     sample_goal = EventTerm(
         func=sample_new_goal,
         mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),  # optional parameter with default
+        },
     )
+
+@configclass
+class GoalTrackingRewardsCfg(RewardsCfg):
+    """Custom rewards for goal tracking with heading and stability."""
+
+    goal_distance = RewTerm(
+        func=goal_distance_exp,
+        weight=2.0,
+        params={"std": 1.0},
+    )
+
+    goal_heading = RewTerm(
+        func=goal_heading_error,
+        weight=1.0,  # stronger than before
+    )
+
+    move_forward = RewTerm(
+        func=forward_toward_goal,
+        weight=1.0,
+    )
+
+    upright = RewTerm(
+        func=upright_penalty,
+        weight=0.5,
+    )
+
 
 
 @configclass
