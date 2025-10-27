@@ -121,3 +121,35 @@ Isaac Lab development initiated from the [Orbit](https://isaac-orbit.github.io/)
    doi={10.1109/LRA.2023.3270034}
 }
 ```
+## Commands
+
+### Locally (Windows)
+
+
+Train Flat Task
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=32  --max_iterations=50 --experiment_name=flat_go2_single --run_name=run17 --headless
+```
+
+Play Flat Task
+
+```
+
+```
+
+
+
+Train task with custom RSL_RL train script:
+
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=32  --max_iterations=50 --experiment_name=flat_go2_single --run_name=run17 --headless
+```
+
+
+### Remote (Ubuntu)
+
+Train Flat Task
+
+```
+python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=flat_go2_single --run_name=run16 --headless
+```

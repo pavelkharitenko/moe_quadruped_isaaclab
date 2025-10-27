@@ -86,10 +86,8 @@ def upright_penalty(
     return - (torch.abs(roll) + torch.abs(pitch))  # negative = penalty
 
 
-# ----------------------------
-# Goal sampling event
-# ----------------------------
 
+# goal sampling event
 def sample_new_goal(env: ManagerBasedRLEnv,
     env_ids: torch.Tensor | None,
     asset_cfg: SceneEntityCfg) -> None:
@@ -113,9 +111,6 @@ def sample_new_goal(env: ManagerBasedRLEnv,
     env.extras["goal_yaw"] = goal_yaw
 
 
-# ----------------------------
-# Configs
-# ----------------------------
 
 
 
@@ -126,7 +121,7 @@ class GoalTrackingEventsCfg(EventCfg):
         func=sample_new_goal,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg("robot"),  # optional parameter with default
+            "asset_cfg": SceneEntityCfg("robot"), 
         },
     )
 
@@ -173,8 +168,12 @@ class UnitreeGo2GoalTrackingEnvCfg(UnitreeGo2FlatEnvCfg):
         self.rewards.lin_vel_z_l2.weight = 0.0
         self.rewards.ang_vel_xy_l2.weight = 0.0
 
-        # Keep useful base/joint/feet rewards from FlatEnvCfg
+        # keep useful base/joint/feet rewards from FlatEnvCfg:
         # (feet air time, joint limits, collision penalties, etc.)
+
+        # TODO check weights of these rewards
+        #Metrics/base_velocity/error_vel_xy: 0.0950
+        #Metrics/base_velocity/error_vel_yaw: 0.1086
 
         # Use flat terrain for goal reaching
         self.scene.terrain.terrain_type = "plane"
@@ -186,9 +185,6 @@ class UnitreeGo2GoalTrackingEnvCfg(UnitreeGo2FlatEnvCfg):
             self.observations.policy.height_scan = None
 
 
-# ----------------------------
-# PLAY variant
-# ----------------------------
 
 class UnitreeGo2GoalTrackingEnvCfg_PLAY(UnitreeGo2GoalTrackingEnvCfg):
     def __post_init__(self):

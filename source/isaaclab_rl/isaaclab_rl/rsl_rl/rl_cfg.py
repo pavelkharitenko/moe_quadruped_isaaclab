@@ -122,7 +122,6 @@ class RslRlPpoAlgorithmCfg:
     in which case RND is not used.
     """
 
-
 #########################
 # Runner configurations #
 #########################

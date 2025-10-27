@@ -51,7 +51,7 @@ def analyze_tfevents(event_file: str):
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
 
-    # 1️⃣ Rewards subplot
+    # Rewards subplot
     ax = axes[0]
     for tag in reward_tags:
         if tag in available:
@@ -72,7 +72,7 @@ def analyze_tfevents(event_file: str):
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    # 2️⃣ Tracking errors subplot
+    # Tracking errors subplot
     ax = axes[1]
     for tag in tracking_tags:
         if tag in available:
@@ -85,7 +85,7 @@ def analyze_tfevents(event_file: str):
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    # 3️⃣ Policy & value losses subplot (normalized)
+    # Policy & value losses subplot (normalized)
     ax = axes[2]
     for tag in policy_tags:
         if tag in available:
@@ -101,7 +101,7 @@ def analyze_tfevents(event_file: str):
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    # 4️⃣ Timesteps / Performance subplot
+    # Timesteps / Performance subplot
     ax = axes[3]
     for tag in timestep_tags:
         if tag in available:
@@ -115,7 +115,9 @@ def analyze_tfevents(event_file: str):
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    experiment_name = os.path.basename(os.path.dirname(os.path.dirname(event_file)))
+    #experiment_name = os.path.basename(os.path.dirname(os.path.dirname(event_file)))
+    #experiment_name = "UnitreeGo2LegStand"
+    experiment_name = "Unitreego2GoalTracking"
     fig.suptitle(f"Training Analysis: {experiment_name}", fontsize=11)
     plt.tight_layout()
     plt.show()
@@ -124,10 +126,10 @@ def analyze_tfevents(event_file: str):
 if __name__ == "__main__":
     # replace with your actual tfevents path
     # Current flat policy
-    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-08_07-45-14_run03\events.out.tfevents.1757310325.ASUSROG16.35732.0"
+    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-08_07-45-14_run03\events.out.tfevents.1757310325.ASUSROG16.35732.0"
     # Current legstand policy
-    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-10_07-51-07_run06\events.out.tfevents.1757483479.ASUSROG16.44592.0"
+    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-15_10-08-13_run13_legstand\events.out.tfevents.1757930909.lrz-server1.116845.0"
     
     # Current goaltracking policy
-    #event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-14_16-14-56_run09\events.out.tfevents.1757866511.lrz-server1.67214.0"
+    event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-15_08-37-53_run13\events.out.tfevents.1757925491.lrz-server1.101913.0"
     analyze_tfevents(event_file)
