@@ -40,8 +40,25 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # update sensor update periods
         
         # TODO from singletask LocomotionVelocityRoughEnvCfg add post_init settings here (to task RoughEnv)
-        
 
+        self.sim.physics_material = self.flatVel.scene.terrain.physics_material # here scene.terrain is red marked
+        # update sensor update periods
+        # we tick all the sensors based on the smallest update period (physics update period)
+        if self.flatVel.scene.height_scanner is not None:
+            self.flatVel.scene.height_scanner.update_period = self.decimation * self.sim.dt
+        if self.flatVel.scene.contact_forces is not None:
+            self.flatVel.scene.contact_forces.update_period = self.sim.dt
+
+        # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
+        # this generates terrains with increasing difficulty and is useful for training
+        if getattr(self.flatVel.curriculum, "terrain_levels", None) is not None:
+            if self.flatVel.scene.terrain.terrain_generator is not None:
+                self.flatVel.scene.terrain.terrain_generator.curriculum = True
+        else:
+            if self.flatVel.scene.terrain.terrain_generator is not None:
+                self.flatVel.scene.terrain.terrain_generator.curriculum = False
+        
+    
 
 
 
@@ -59,3 +76,5 @@ class MTLocomotionEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
         # remove random pushing event
         self.events.base_external_force_torque = None
         self.events.push_robot = None
+
+       

@@ -153,3 +153,41 @@ Train Flat Task
 ```
 python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=flat_go2_single --run_name=run16 --headless
 ```
+
+
+Train Legstand Task
+
+```
+python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-LegStand-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=legstand_go2_single --run_name=run18_legstand --headless
+```
+
+Train Terrain Task
+
+```
+python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Rough-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=3000 --experiment_name=terrain_go2_single --run_name=run19_terrain --headless
+```
+
+
+## Multitask Environment
+
+Original author: https://github.com/meenalparakh/MT-IsaacLab
+
+1. Create in source/isaaclab/envs/ two files, `manager_based_mt_rl_env(_cfg).py`, export their classes in `__init__.py`
+
+2. Create folder in source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity, with similar structure to how the normal locomotion/velocity folder is.
+
+3. In the normal velocity/velocity_env_cfg.py, we have MySceneCfg and LocomotionVelocityRoughEnvCfg, here we change both to fit Multitask setting: MySceneCfg should differntiate world- and task specific scene elements through self.world_ prefix. LocomotionVelocityRoughEnvCfg should have no __post_init__(self) method and subclass from TaskConfigs.
+
+4. In velocity/config/ dir, create the multitask env go2_mt. Here we need to rewrite the original go2 configs rough_env_cfg.py, flat_env_cfg.py, ... etc. to match the multitask configs:
+
+- import LocomotionVelocityRoughEnvCfg from isaaclab_tasks.manager_based.locomotion_multitask instead from locomotion.velocity
+
+- subclass it to create UnitreeGo2RoughEnvCfg
+
+- remove super.__init__(), and just write everything inside __post_init__(self)
+
+5. Write the actual Multitask Environment: create a file, mt_env_cfg.py, in which a MTLocomotion class subclasses ManagerBasedMTRL. 
+
+- Put all tasks coded according to step 4. as attributes. 
+
+- Write a function __post_init__(self) in which all setups of __post__init() of LocomotionVelocityRoughEnvCfg should be done.
