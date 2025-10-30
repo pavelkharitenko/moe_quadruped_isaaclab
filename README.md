@@ -145,6 +145,12 @@ Train task with custom RSL_RL train script:
 C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=32  --max_iterations=50 --experiment_name=flat_go2_single --run_name=run17 --headless
 ```
 
+Train in Multitask env:
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_multitask.py --task=Isaac-MT-Unitree-Go2-v0  --num_envs=38  --max_iterations=50 --experiment_name=flat_go2_mt --run_name=run19_mt
+```
+
+
 
 ### Remote (Ubuntu)
 

@@ -4,10 +4,23 @@ import numpy as np
 import os
 
 
+
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-import matplotlib.pyplot as plt
-import numpy as np
-import os
+
+# Path to your TensorBoard event file or directory
+event_path = r"logs\rsl_rl\unitree_go2_flat\2025-10-30_11-23-05_run21_mt32\events.out.tfevents.1761819790.ASUSROG16.38932.0"
+
+
+# Load events
+ea = EventAccumulator(event_path)
+ea.Reload()
+
+# Print all available scalar tags
+print("Available scalar tags:")
+for tag in ea.Tags().get("scalars", []):
+    print("-", tag)
+
+exit(0)
 
 
 def analyze_tfevents(event_file: str):
@@ -123,6 +136,7 @@ def analyze_tfevents(event_file: str):
     plt.show()
 
 
+
 if __name__ == "__main__":
     # replace with your actual tfevents path
     # Current flat policy
@@ -132,4 +146,7 @@ if __name__ == "__main__":
     
     # Current goaltracking policy
     event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\2025-09-15_08-37-53_run13\events.out.tfevents.1757925491.lrz-server1.101913.0"
+
+    # multitask training mt4 with two envs
+    event_file = r"logs\rsl_rl\unitree_go2_flat\2025-10-30_11-23-05_run21_mt32\events.out.tfevents.1761819790.ASUSROG16.38932.0"
     analyze_tfevents(event_file)

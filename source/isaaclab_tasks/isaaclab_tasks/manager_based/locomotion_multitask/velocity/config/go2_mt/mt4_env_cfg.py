@@ -16,8 +16,8 @@ from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
 class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
 
-    flatVel1: TaskConfigs = UnitreeGo2LegStandEnvCfg()
-    flatVel2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
+    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
     #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
@@ -26,7 +26,7 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # general settings
         self.decimation = 4
         self.num_multi_task_envs = 2
-        self.task_spacing = 2.5
+        self.task_spacing = 20.5
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
         self.append_task_id = False
@@ -42,8 +42,6 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # update sensor update periods
         
         # TODO from singletask LocomotionVelocityRoughEnvCfg add post_init settings here (to task RoughEnv)
-        #self.flatVel1.scene.initialize()
-        #self.flatVel2.scene.initialize()
 
         # scale down the terrains because the robot is small
         """

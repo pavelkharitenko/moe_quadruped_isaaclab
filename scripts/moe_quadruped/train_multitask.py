@@ -174,11 +174,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
 
-    print("#######################################")
-
-    print("################## start learning #####################")
-
-    print("#######################################")
     # run training
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=False)
 
