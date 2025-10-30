@@ -16,8 +16,10 @@ from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
 class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
 
-    flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
-    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    flatVel1: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    flatVel2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+
+    #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
     def __post_init__(self):
         """Post initialization."""
@@ -40,30 +42,43 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # update sensor update periods
         
         # TODO from singletask LocomotionVelocityRoughEnvCfg add post_init settings here (to task RoughEnv)
+        #self.flatVel1.scene.initialize()
+        #self.flatVel2.scene.initialize()
 
-        self.sim.physics_material = self.flatVel.scene.terrain.physics_material # here scene.terrain is red marked
+        # scale down the terrains because the robot is small
+        """
+        self.flatVel1.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
+        self.flatVel1.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
+        self.flatVel1.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+
+        self.flatVel1.scene.terrain.terrain_type = "plane"
+        self.flatVel1.scene.terrain.terrain_generator = None
+
+        self.sim.physics_material = self.flatVel1.scene.terrain.physics_material # here scene.terrain is red marked
+
         # update sensor update periods
         # we tick all the sensors based on the smallest update period (physics update period)
-        if self.flatVel.scene.height_scanner is not None:
-            self.flatVel.scene.height_scanner.update_period = self.decimation * self.sim.dt
-        if self.flatVel.scene.contact_forces is not None:
-            self.flatVel.scene.contact_forces.update_period = self.sim.dt
+        if self.flatVel1.scene.height_scanner is not None:
+            self.flatVel1.scene.height_scanner.update_period = self.decimation * self.sim.dt
+        if self.flatVel1.scene.contact_forces is not None:
+            self.flatVel1.scene.contact_forces.update_period = self.sim.dt
 
         # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
         # this generates terrains with increasing difficulty and is useful for training
-        if getattr(self.flatVel.curriculum, "terrain_levels", None) is not None:
-            if self.flatVel.scene.terrain.terrain_generator is not None:
+        if getattr(self.flatVel1.curriculum, "terrain_levels", None) is not None:
+            if self.flatVel1.scene.terrain.terrain_generator is not None:
                 self.flatVel.scene.terrain.terrain_generator.curriculum = True
         else:
-            if self.flatVel.scene.terrain.terrain_generator is not None:
-                self.flatVel.scene.terrain.terrain_generator.curriculum = False
+            if self.flatVel1.scene.terrain.terrain_generator is not None:
+                self.flatVel1.scene.terrain.terrain_generator.curriculum = False
+        """
         
     
 
 
 
-
-class MTLocomotionEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
+"""
+class MTLocomotionEnvCfg_PLAY(MTLocomotionEnvCfg):
     def __post_init__(self) -> None:
         # post init of parent
         super().__post_init__()
@@ -76,5 +91,6 @@ class MTLocomotionEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
         # remove random pushing event
         self.events.base_external_force_torque = None
         self.events.push_robot = None
+"""
 
        

@@ -1,14 +1,14 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+import numpy as np
 import torch
 from collections.abc import Sequence
 from typing import Any
 
 import carb
-import omni.log
 import omni.usd
 from isaacsim.core.cloner import GridCloner
 from isaacsim.core.prims import XFormPrim
@@ -134,8 +134,10 @@ class InteractiveScene:
         # this triggers per-object level cloning in the spawner.
         if not self.cfg.replicate_physics:
             # clone the env xform
+            position_offsets = np.array(self.cfg.pos_offset).reshape(1, 3).repeat(self.cfg.num_envs, axis=0)
             env_origins = self.cloner.clone(
                 source_prim_path=self.env_prim_paths[0],
+                position_offsets=position_offsets,
                 prim_paths=self.env_prim_paths,
                 replicate_physics=False,
                 copy_from_source=True,
@@ -166,8 +168,7 @@ class InteractiveScene:
 
             # since env_ids is only applicable when replicating physics, we have to fallback to the previous method
             # to filter collisions if replicate_physics is not enabled
-            # additionally, env_ids is only supported in GPU simulation
-            if (not self.cfg.replicate_physics and self.cfg.filter_collisions) or self.device == "cpu":
+            if not self.cfg.replicate_physics and self.cfg.filter_collisions:
                 self.filter_collisions(self._global_prim_paths)
 
     def clone_environments(self, copy_from_source: bool = False):
@@ -189,9 +190,12 @@ class InteractiveScene:
                 " This may adversely affect PhysX parsing. We recommend disabling this property."
             )
 
+        position_offsets = np.array(self.cfg.pos_offset).reshape(1, 3).repeat(self.cfg.num_envs, axis=0)
+
         # clone the environment
         env_origins = self.cloner.clone(
             source_prim_path=self.env_prim_paths[0],
+            position_offsets=position_offsets,
             prim_paths=self.env_prim_paths,
             replicate_physics=self.cfg.replicate_physics,
             copy_from_source=copy_from_source,
@@ -200,10 +204,9 @@ class InteractiveScene:
 
         # since env_ids is only applicable when replicating physics, we have to fallback to the previous method
         # to filter collisions if replicate_physics is not enabled
-        # additionally, env_ids is only supported in GPU simulation
-        if (not self.cfg.replicate_physics and self.cfg.filter_collisions) or self.device == "cpu":
+        if not self.cfg.replicate_physics and self.cfg.filter_collisions:
             omni.log.warn(
-                "Collision filtering can only be automatically enabled when replicate_physics=True and GPU simulation."
+                "Collision filtering can only be automatically enabled when replicate_physics=True."
                 " Please call scene.filter_collisions(global_prim_paths) to filter collisions across environments."
             )
 
@@ -235,7 +238,7 @@ class InteractiveScene:
         # filter collisions within each environment instance
         self.cloner.filter_collisions(
             self.physics_scene_path,
-            "/World/collisions",
+            f"/World/collisions_{self.cfg.env_prefix}",
             self.env_prim_paths,
             global_paths=self._global_prim_paths,
         )
@@ -253,6 +256,11 @@ class InteractiveScene:
     """
     Properties.
     """
+
+    @property
+    def global_prim_paths(self) -> list[str]:
+        """A list of global prim paths to enable collisions with."""
+        return self._global_prim_paths
 
     @property
     def physics_scene_path(self) -> str:
@@ -279,12 +287,12 @@ class InteractiveScene:
 
     @property
     def env_ns(self) -> str:
-        """The namespace ``/World/envs`` in which all environments created.
+        """The namespace ``/World/[prefix]_envs`` in which all environments created.
 
         The environments are present w.r.t. this namespace under "env_{N}" prim,
         where N is a natural number.
         """
-        return "/World/envs"
+        return f"/World/{self.cfg.env_prefix}_envs"
 
     @property
     def env_regex_ns(self) -> str:
@@ -540,7 +548,7 @@ class InteractiveScene:
         state["articulation"] = dict()
         for asset_name, articulation in self._articulations.items():
             asset_state = dict()
-            asset_state["root_pose"] = articulation.data.root_pose_w.clone()
+            asset_state["root_pose"] = articulation.data.root_state_w[:, :7].clone()
             if is_relative:
                 asset_state["root_pose"][:, :3] -= self.env_origins
             asset_state["root_velocity"] = articulation.data.root_vel_w.clone()
@@ -560,7 +568,7 @@ class InteractiveScene:
         state["rigid_object"] = dict()
         for asset_name, rigid_object in self._rigid_objects.items():
             asset_state = dict()
-            asset_state["root_pose"] = rigid_object.data.root_pose_w.clone()
+            asset_state["root_pose"] = rigid_object.data.root_state_w[:, :7].clone()
             if is_relative:
                 asset_state["root_pose"][:, :3] -= self.env_origins
             asset_state["root_velocity"] = rigid_object.data.root_vel_w.clone()
@@ -624,12 +632,7 @@ class InteractiveScene:
     Internal methods.
     """
 
-    def _is_scene_setup_from_cfg(self) -> bool:
-        """Check if scene entities are setup from the config or not.
-
-        Returns:
-            True if scene entities are setup from the config, False otherwise.
-        """
+    def _is_scene_setup_from_cfg(self):
         return any(
             not (asset_name in InteractiveSceneCfg.__dataclass_fields__ or asset_cfg is None)
             for asset_name, asset_cfg in self.cfg.__dict__.items()

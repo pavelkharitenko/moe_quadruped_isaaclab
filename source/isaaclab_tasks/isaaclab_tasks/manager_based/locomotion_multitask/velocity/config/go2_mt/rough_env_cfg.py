@@ -6,7 +6,7 @@
 from isaaclab.utils import configclass
 
 
-from isaaclab_tasks.manager_based.locomotion_multitask.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
+from isaaclab_tasks.manager_based.locomotion_multitask.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, MySceneCfg
 
 
 ##
@@ -20,13 +20,21 @@ class UnitreeGo2RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
     def __post_init__(self):
 
         
-
         self.scene.robot = UNITREE_GO2_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
+
+        
         # scale down the terrains because the robot is small
+        """
         self.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
         self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
         self.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+        """
+
+        self.scene.world_terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
+        self.scene.world_terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
+        self.scene.world_terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+        
 
         # reduce action scale
         self.actions.joint_pos.scale = 0.25

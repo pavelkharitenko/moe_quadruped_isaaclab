@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -52,7 +52,7 @@ class InteractiveSceneCfg:
             height_scanner = RayCasterCfg(
                 prim_path="{ENV_REGEX_NS}/Robot_1/base",
                 offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-                ray_alignment="yaw",
+                attach_yaw_only=True,
                 pattern_cfg=GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
                 debug_vis=True,
                 mesh_prim_paths=["/World/ground"],
@@ -76,6 +76,12 @@ class InteractiveSceneCfg:
     This is the default distance between environment origins in the scene. Used only when the
     number of environments is greater than one.
     """
+
+    env_prefix: str = "default"
+    """Prefix for environment instances in multi-task setups"""
+
+    pos_offset: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    """Position offset for the environment instances, necessary for multi-task setups."""
 
     lazy_sensor_update: bool = True
     """Whether to update sensors only when they are accessed. Default is True.

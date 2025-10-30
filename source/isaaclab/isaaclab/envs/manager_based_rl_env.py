@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -16,6 +16,7 @@ from typing import Any, ClassVar
 from isaacsim.core.version import get_version
 
 from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, TerminationManager
+from isaaclab.sim import SimulationContext
 from isaaclab.ui.widgets import ManagerLiveVisualizer
 
 from .common import VecEnvStepReturn
@@ -64,26 +65,29 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
     cfg: ManagerBasedRLEnvCfg
     """Configuration for the environment."""
 
-    def __init__(self, cfg: ManagerBasedRLEnvCfg, render_mode: str | None = None, **kwargs):
+    def __init__(
+        self, cfg: ManagerBasedRLEnvCfg, sim: SimulationContext | None = None, render_mode: str | None = None, **kwargs
+    ):
         """Initialize the environment.
 
         Args:
             cfg: The configuration for the environment.
+            sim: The simulation context to use for the environment. Provide this only for multi-environment setups,
+                where all environments share the same simulation context.
             render_mode: The render mode for the environment. Defaults to None, which
                 is similar to ``"human"``.
         """
         # -- counter for curriculum
         self.common_step_counter = 0
 
-        # initialize the episode length buffer BEFORE loading the managers to use it in mdp functions.
-        self.episode_length_buf = torch.zeros(cfg.scene.num_envs, device=cfg.sim.device, dtype=torch.long)
-
         # initialize the base class to setup the scene.
-        super().__init__(cfg=cfg)
+        super().__init__(cfg=cfg, sim=sim)
         # store the render mode
         self.render_mode = render_mode
 
         # initialize data and constants
+        # -- init buffers
+        self.episode_length_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
         # -- set the framerate of the gym video recorder wrapper so that the playback speed of the produced video matches the simulation
         self.metadata["render_fps"] = 1 / self.step_dt
 
@@ -237,7 +241,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
             self.event_manager.apply(mode="interval", dt=self.step_dt)
         # -- compute observations
         # note: done after reset to get the correct observations for reset envs
-        self.obs_buf = self.observation_manager.compute(update_history=True)
+        self.obs_buf = self.observation_manager.compute()
 
         # return observations, rewards, resets and extras
         return self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, self.extras
@@ -333,13 +337,10 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
             if has_concatenated_obs:
                 self.single_observation_space[group_name] = gym.spaces.Box(low=-np.inf, high=np.inf, shape=group_dim)
             else:
-                group_term_cfgs = self.observation_manager._group_obs_term_cfgs[group_name]
-                for term_name, term_dim, term_cfg in zip(group_term_names, group_dim, group_term_cfgs):
-                    low = -np.inf if term_cfg.clip is None else term_cfg.clip[0]
-                    high = np.inf if term_cfg.clip is None else term_cfg.clip[1]
-                    self.single_observation_space[group_name] = gym.spaces.Dict(
-                        {term_name: gym.spaces.Box(low=low, high=high, shape=term_dim)}
-                    )
+                self.single_observation_space[group_name] = gym.spaces.Dict({
+                    term_name: gym.spaces.Box(low=-np.inf, high=np.inf, shape=term_dim)
+                    for term_name, term_dim in zip(group_term_names, group_dim)
+                })
         # action space (unbounded since we don't impose any limits)
         action_dim = sum(self.action_manager.action_term_dim)
         self.single_action_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(action_dim,))

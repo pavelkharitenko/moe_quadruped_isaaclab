@@ -19,8 +19,13 @@ class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
         self.rewards.feet_air_time.weight = 0.25
 
         # change terrain to flat
+        """
         self.scene.terrain.terrain_type = "plane"
         self.scene.terrain.terrain_generator = None
+        """
+        self.scene.world_terrain.terrain_type = "plane"
+        self.scene.world_terrain.terrain_generator = None       
+        
         # no height scan
         self.scene.height_scanner = None
         self.observations.policy.height_scan = None
@@ -34,7 +39,7 @@ class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
 class UnitreeGo2FlatEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
     def __post_init__(self) -> None:
         # post init of parent
-        super().__post_init__()
+        #super().__post_init__()
 
         # make a smaller scene for play
         self.scene.num_envs = 50
