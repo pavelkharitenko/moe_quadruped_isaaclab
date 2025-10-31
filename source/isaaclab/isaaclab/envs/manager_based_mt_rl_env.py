@@ -243,6 +243,12 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         # post-step:
 
+        all_rewards = []
+        all_reset_terminated = []
+        all_reset_time_outs = []
+        all_obs = {}
+        extras = {}
+
         is_reset = False
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.curriculum_manager.compute(env_ids=None)
@@ -263,6 +269,17 @@ class ManagerBasedMTRLEnv(gym.Env):
                 # -- update command
                 task_env.scene.write_data_to_sim()
 
+                # Record completed episode info for logging
+                for env_id in reset_env_ids:
+                    if "episode" not in task_env.extras:
+                        task_env.extras["episode"] = []
+                    task_env.extras["episode"].append({
+                        "task_name": task_name,
+                        "task_id": task_idx,
+                        "reward": task_env.reward_buf[env_id].item(),
+                        "length": task_env.episode_length_buf[env_id].item()
+                    })
+
             is_reset = is_reset or (len(reset_env_ids) > 0)
 
             # -- update command
@@ -270,9 +287,6 @@ class ManagerBasedMTRLEnv(gym.Env):
             # -- step interval events
             if "interval" in task_env.event_manager.available_modes:
                 task_env.event_manager.apply(mode="interval", dt=self.step_dt)
-            # -- compute observations
-            # note: done after reset to get the correct observations for reset envs
-            task_env.obs_buf = task_env.observation_manager.compute()
 
         if is_reset:
             self.sim.forward()
@@ -280,27 +294,41 @@ class ManagerBasedMTRLEnv(gym.Env):
                 self.sim.render()
 
         # concatenate the observations, rewards, resets and extras
+        for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
+            task_env.obs_buf = task_env.observation_manager.compute()
+            all_rewards.append(task_env.reward_buf)
+            all_reset_terminated.append(task_env.reset_terminated)
+            all_reset_time_outs.append(task_env.reset_time_outs)
+            all_obs[task_name] = task_env.obs_buf
 
-        reward_buf = [task_env.reward_buf for task_env in self.envs.values()]
-        reset_terminated = [task_env.reset_terminated for task_env in self.envs.values()]
-        reset_time_outs = [task_env.reset_time_outs for task_env in self.envs.values()]
-        extras = {task_name: task_env.extras for task_name, task_env in self.envs.items()}
+            # copy existing extras dict if available
+            extras[task_name] = dict(task_env.extras)
+            # add task metadata
+            extras[task_name]["task_id"] = task_idx
+            extras[task_name]["task_name"] = task_name
+            # optionally: include mean reward for that task
+            extras[task_name]["mean_reward"] = task_env.reward_buf.mean().item()
 
-        obs_buf = {task_name: task_env.obs_buf for task_name, task_env in self.envs.items()}
+            #reward_buf = [task_env.reward_buf for task_env in self.envs.values()]
+            #reset_terminated = [task_env.reset_terminated for task_env in self.envs.values()]
+            #reset_time_outs = [task_env.reset_time_outs for task_env in self.envs.values()]
+            #extras = {task_name: task_env.extras for task_name, task_env in self.envs.items()}
+
+
 
         if self.cfg.concatenate_step_results:
             # assumes that all environments have the same observation space
-            self.reward_buf = torch.cat(reward_buf, dim=0)
-            self.reset_terminated = torch.cat(reset_terminated, dim=0)
-            self.reset_time_outs = torch.cat(reset_time_outs, dim=0)
-
-            self.obs_buf = concatenate_observations(list(obs_buf.values()))
+            self.reward_buf = torch.cat(all_rewards, dim=0)
+            self.reset_terminated = torch.cat(all_reset_terminated, dim=0)
+            self.reset_time_outs = torch.cat(all_reset_time_outs, dim=0)
+            self.obs_buf = concatenate_observations(list(all_obs.values()))
 
         else:
-            self.reward_buf = torch.stack(reward_buf, dim=0)
-            self.reset_terminated = torch.stack(reset_terminated, dim=0)
-            self.reset_time_outs = torch.stack(reset_time_outs, dim=0)
-            self.obs_buf = obs_buf
+            self.reward_buf = torch.stack(all_rewards, dim=0)
+            self.reset_terminated = torch.stack(all_reset_terminated, dim=0)
+            self.reset_time_outs = torch.stack(all_reset_time_outs, dim=0)
+            self.obs_buf = all_obs
+
 
         return (
             self.obs_buf,
@@ -309,6 +337,8 @@ class ManagerBasedMTRLEnv(gym.Env):
             self.reset_time_outs,
             extras,
         )
+    
+    
 
     def _reset_idx(self, task_name, env_ids: Sequence[int]):
         """Reset environments based on specified indices.

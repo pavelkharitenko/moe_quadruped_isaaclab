@@ -61,7 +61,12 @@ import gymnasium as gym
 import os, torch
 from datetime import datetime
 
-from rsl_rl.runners import OnPolicyRunner
+#from rsl_rl.runners import OnPolicyRunner
+
+# use custom 
+from isaaclab_rl.rsl_rl.rsl_moe import MyActorCritic, MyOnPolicyRunner
+globals()["MyActorCritic"] = MyActorCritic
+
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -157,7 +162,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
     
     # create runner from rsl-rl
-    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    runner = MyOnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     
     # write git state to logs
     runner.add_git_repo_to_log(__file__)

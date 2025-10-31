@@ -1,26 +1,8 @@
-from rsl_rl.modules import ActorCritic
-
-
-class MyActorCritic(ActorCritic):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # add your custom layers or logic here
-        print("#################################################")
-        print(" Using Custom MyActorCritic")
-        print("#################################################")
-
-
-from rsl_rl.runners.on_policy_runner import OnPolicyRunner
-
-
-
-
-
-
 import torch
 from collections import deque
 
 import rsl_rl
+from rsl_rl.runners.on_policy_runner import OnPolicyRunner
 from rsl_rl.algorithms import PPO, Distillation
 from rsl_rl.env import VecEnv
 from rsl_rl.modules import (
@@ -30,7 +12,15 @@ from rsl_rl.modules import (
     StudentTeacher,
     StudentTeacherRecurrent,
 )
-from rsl_rl.utils import store_code_state
+
+
+class MyActorCritic(ActorCritic):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # add your custom layers or logic here
+        print("#################################################")
+        print(" Using Custom MyActorCritic")
+        print("#################################################")
 
 
 class MyOnPolicyRunner(OnPolicyRunner):
@@ -139,3 +129,34 @@ class MyOnPolicyRunner(OnPolicyRunner):
         self.tot_time = 0
         self.current_learning_iteration = 0
         self.git_status_repos = [rsl_rl.__file__]
+
+
+
+    def log(self, locs: dict, width: int = 80, pad: int = 35):
+        super().log(locs, width, pad)  # run original logging first
+
+        # --- add per-task logging ---
+        #if not locs["ep_infos"] or self.disable_logs:
+        #    return
+        print("custom log ##################")
+        # collect episode info by task
+        task_ep_info = {}
+        for ep_info in locs["ep_infos"]:
+            task = ep_info.get("task_name", "unknown")
+            if task not in task_ep_info:
+                task_ep_info[task] = {"rewards": [], "lengths": []}
+            if "reward" in ep_info:
+                task_ep_info[task]["rewards"].append(float(ep_info["reward"]))
+            if "length" in ep_info:
+                task_ep_info[task]["lengths"].append(float(ep_info["length"]))
+
+        # compute and log per-task averages
+        for task, vals in task_ep_info.items():
+            if len(vals["rewards"]) == 0:
+                continue
+            mean_r = sum(vals["rewards"]) / len(vals["rewards"])
+            mean_l = sum(vals["lengths"]) / len(vals["lengths"])
+            self.writer.add_scalar(f"Train/task/{task}/mean_reward", mean_r, locs["it"])
+            self.writer.add_scalar(f"Train/task/{task}/mean_episode_length", mean_l, locs["it"])
+
+            print(f"   Task {task:>15s}: reward={mean_r:.3f}, len={mean_l:.1f}")
