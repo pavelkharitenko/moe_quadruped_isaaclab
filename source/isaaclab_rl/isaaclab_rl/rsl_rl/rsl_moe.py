@@ -1,5 +1,10 @@
+import pprint
 import torch
 from collections import deque
+import os
+import time
+import statistics
+from rsl_rl.utils import store_code_state
 
 import rsl_rl
 from rsl_rl.runners.on_policy_runner import OnPolicyRunner
@@ -130,33 +135,50 @@ class MyOnPolicyRunner(OnPolicyRunner):
         self.current_learning_iteration = 0
         self.git_status_repos = [rsl_rl.__file__]
 
-
-
     def log(self, locs: dict, width: int = 80, pad: int = 35):
-        super().log(locs, width, pad)  # run original logging first
+        super().log(locs, width, pad)
 
-        # --- add per-task logging ---
-        #if not locs["ep_infos"] or self.disable_logs:
-        #    return
-        print("custom log ##################")
-        # collect episode info by task
-        task_ep_info = {}
-        for ep_info in locs["ep_infos"]:
-            task = ep_info.get("task_name", "unknown")
-            if task not in task_ep_info:
-                task_ep_info[task] = {"rewards": [], "lengths": []}
-            if "reward" in ep_info:
-                task_ep_info[task]["rewards"].append(float(ep_info["reward"]))
-            if "length" in ep_info:
-                task_ep_info[task]["lengths"].append(float(ep_info["length"]))
+        log_string = f"""{'-' * width}\n"""
 
-        # compute and log per-task averages
-        for task, vals in task_ep_info.items():
-            if len(vals["rewards"]) == 0:
+        # --- append per-task mean rewards, same style ---
+        infos = locs.get("infos", {})
+        for task_key, task_data in infos.items():
+            if task_key in ["observations", "time_outs"]:
                 continue
-            mean_r = sum(vals["rewards"]) / len(vals["rewards"])
-            mean_l = sum(vals["lengths"]) / len(vals["lengths"])
-            self.writer.add_scalar(f"Train/task/{task}/mean_reward", mean_r, locs["it"])
-            self.writer.add_scalar(f"Train/task/{task}/mean_episode_length", mean_l, locs["it"])
+            if not isinstance(task_data, dict) or "mean_reward" not in task_data:
+                continue
+            task_name = task_data.get("task_name", task_key)
+            mean_rew = task_data["mean_reward"]
+            log_string += f"{task_name + ':':>{pad}} {mean_rew:8.3f}\n"
 
-            print(f"   Task {task:>15s}: reward={mean_r:.3f}, len={mean_l:.1f}")
+
+        # --- print final log block ---
+        print(log_string)
+
+        # --- TensorBoard / WandB logging ---
+        if self.writer:
+            for task_key, task_data in infos.items():
+                if task_key in ["observations", "time_outs"]:
+                    continue
+                if not isinstance(task_data, dict) or "mean_reward" not in task_data:
+                    continue
+                task_name = task_data.get("task_name", task_key)
+                mean_rew = task_data["mean_reward"]
+                self.writer.add_scalar(f"Rewards/{task_name}/mean", mean_rew, self.current_learning_iteration)
+
+                # log sub-terms silently
+                log_dict = task_data.get("log", {})
+                for term_name, term_value in log_dict.items():
+                    if torch.is_tensor(term_value):
+                        term_value = term_value.item()
+                    self.writer.add_scalar(
+                        f"Rewards/{task_name}/{term_name}",
+                        term_value,
+                        self.current_learning_iteration,
+                    )
+
+
+
+
+    def _log_to_console(self, name: str, value: float, width: int, pad: int):
+        print(f"{name:<{pad}} | {value:>{width - pad - 3}.3f}")

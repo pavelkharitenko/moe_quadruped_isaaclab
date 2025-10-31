@@ -255,14 +255,16 @@ class ManagerBasedMTRLEnv(gym.Env):
 
             task_env.episode_length_buf += 1
             task_env.common_step_counter += 1  # total step (common for all envs)
+
             # -- check terminations
             task_env.reset_buf = task_env.termination_manager.compute()
             task_env.reset_terminated = task_env.termination_manager.terminated
             task_env.reset_time_outs = task_env.termination_manager.time_outs
+
             # -- reward computation
             task_env.reward_buf = task_env.reward_manager.compute(dt=self.step_dt)
-            # -- reset envs that terminated/timed-out and log the episode information
 
+            # -- reset envs that terminated/timed-out and log the episode information
             reset_env_ids = task_env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
             if len(reset_env_ids) > 0:
                 task_env._reset_idx(reset_env_ids)
@@ -293,6 +295,7 @@ class ManagerBasedMTRLEnv(gym.Env):
             if self.sim.has_rtx_sensors() and self.cfg.rerender_on_reset:
                 self.sim.render()
 
+
         # concatenate the observations, rewards, resets and extras
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
@@ -301,13 +304,15 @@ class ManagerBasedMTRLEnv(gym.Env):
             all_reset_time_outs.append(task_env.reset_time_outs)
             all_obs[task_name] = task_env.obs_buf
 
+            
             # copy existing extras dict if available
             extras[task_name] = dict(task_env.extras)
-            # add task metadata
+            # add task metadata and mean rew. of task
             extras[task_name]["task_id"] = task_idx
             extras[task_name]["task_name"] = task_name
-            # optionally: include mean reward for that task
             extras[task_name]["mean_reward"] = task_env.reward_buf.mean().item()
+
+        
 
             #reward_buf = [task_env.reward_buf for task_env in self.envs.values()]
             #reset_terminated = [task_env.reset_terminated for task_env in self.envs.values()]
@@ -330,12 +335,14 @@ class ManagerBasedMTRLEnv(gym.Env):
             self.obs_buf = all_obs
 
 
+    
+        # Return with episode info in the expected format
         return (
             self.obs_buf,
             self.reward_buf,
             self.reset_terminated,
             self.reset_time_outs,
-            extras,
+            extras
         )
     
     

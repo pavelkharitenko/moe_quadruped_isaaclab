@@ -17,16 +17,16 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
 
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
-    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    #flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
-    #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
     def __post_init__(self):
         """Post initialization."""
         # general settings
         self.decimation = 4
         self.num_multi_task_envs = 2
-        self.task_spacing = 20.5
+        self.task_spacing = 20.0
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
         self.append_task_id = False
