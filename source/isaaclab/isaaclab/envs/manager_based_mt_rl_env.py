@@ -251,6 +251,8 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         is_reset = False
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
+            
+
             task_env.curriculum_manager.compute(env_ids=None)
 
             task_env.episode_length_buf += 1
@@ -264,23 +266,44 @@ class ManagerBasedMTRLEnv(gym.Env):
             # -- reward computation
             task_env.reward_buf = task_env.reward_manager.compute(dt=self.step_dt)
 
+            # for episode statistics
+            if not hasattr(task_env, "_episode_reward_accum"):
+                task_env._episode_reward_accum = torch.zeros_like(task_env.reward_buf)
+
+            # add to episode buffer
+            task_env._episode_reward_accum += task_env.reward_buf
+
             # -- reset envs that terminated/timed-out and log the episode information
             reset_env_ids = task_env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-            if len(reset_env_ids) > 0:
-                task_env._reset_idx(reset_env_ids)
-                # -- update command
-                task_env.scene.write_data_to_sim()
 
-                # Record completed episode info for logging
+
+            if len(reset_env_ids) > 0:
+
+                # first record data, then reset
+
+                # record completed episode info for logging
                 for env_id in reset_env_ids:
+                    ep_reward = task_env._episode_reward_accum[env_id].item()
+                    ep_length = task_env.episode_length_buf[env_id].item()
+
                     if "episode" not in task_env.extras:
                         task_env.extras["episode"] = []
+                    
+
                     task_env.extras["episode"].append({
                         "task_name": task_name,
                         "task_id": task_idx,
-                        "reward": task_env.reward_buf[env_id].item(),
-                        "length": task_env.episode_length_buf[env_id].item()
+                        "reward": ep_reward,
+                        "length": ep_length,
                     })
+
+                    # Reset accumulators for next episode
+                    task_env._episode_reward_accum[env_id] = 0.0
+
+
+                task_env._reset_idx(reset_env_ids)
+                # -- update command
+                task_env.scene.write_data_to_sim()
 
             is_reset = is_reset or (len(reset_env_ids) > 0)
 
@@ -312,13 +335,19 @@ class ManagerBasedMTRLEnv(gym.Env):
             extras[task_name]["task_name"] = task_name
             extras[task_name]["mean_reward"] = task_env.reward_buf.mean().item()
 
-        
+            # Add episodic statistics on top of existing per-step metrics
+            # ------------------------------------------------------------------
+            if "episode" in task_env.extras and len(task_env.extras["episode"]) > 0:
+                # Compute the mean of recorded episode rewards and lengths
+                ep_rewards = [ep["reward"] for ep in task_env.extras["episode"]]
+                ep_lengths = [ep["length"] for ep in task_env.extras["episode"]]
 
-            #reward_buf = [task_env.reward_buf for task_env in self.envs.values()]
-            #reset_terminated = [task_env.reset_terminated for task_env in self.envs.values()]
-            #reset_time_outs = [task_env.reset_time_outs for task_env in self.envs.values()]
-            #extras = {task_name: task_env.extras for task_name, task_env in self.envs.items()}
-
+                extras[task_name]["mean_episode_reward"] = float(np.mean(ep_rewards))
+                extras[task_name]["mean_episode_length"] = float(np.mean(ep_lengths))
+            else:
+                # No completed episodes yet — fill with NaN for logging consistency
+                extras[task_name]["mean_episode_reward"] = float('nan')
+                extras[task_name]["mean_episode_length"] = float('nan')
 
 
         if self.cfg.concatenate_step_results:

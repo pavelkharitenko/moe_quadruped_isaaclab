@@ -136,23 +136,32 @@ class MyOnPolicyRunner(OnPolicyRunner):
         self.git_status_repos = [rsl_rl.__file__]
 
     def log(self, locs: dict, width: int = 80, pad: int = 35):
+        # Call superclass logger (prints losses, mean reward, etc.)
         super().log(locs, width, pad)
 
         log_string = f"""{'-' * width}\n"""
 
-        # --- append per-task mean rewards, same style ---
+        # --- append per-task rewards and episode statistics ---
         infos = locs.get("infos", {})
         for task_key, task_data in infos.items():
             if task_key in ["observations", "time_outs"]:
                 continue
-            if not isinstance(task_data, dict) or "mean_reward" not in task_data:
+            if not isinstance(task_data, dict):
                 continue
+
             task_name = task_data.get("task_name", task_key)
-            mean_rew = task_data["mean_reward"]
-            log_string += f"{task_name + ':':>{pad}} {mean_rew:8.3f}\n"
+            mean_rew = task_data.get("mean_reward", float("nan"))
+            mean_ep_rew = task_data.get("mean_episode_reward", float("nan"))
+            mean_ep_len = task_data.get("mean_episode_length", float("nan"))
 
+            # Log all metrics in the same aligned style as superclass
+            log_string += (
+                f"{task_name + ' (per-step):':>{pad}} {mean_rew:8.3f}\n"
+                f"{task_name + ' (episode):':>{pad}} {mean_ep_rew:8.3f}\n"
+                f"{task_name + ' (ep. length):':>{pad}} {mean_ep_len:8.1f}\n"
+            )
 
-        # --- print final log block ---
+        # --- print final block ---
         print(log_string)
 
         # --- TensorBoard / WandB logging ---
@@ -160,13 +169,24 @@ class MyOnPolicyRunner(OnPolicyRunner):
             for task_key, task_data in infos.items():
                 if task_key in ["observations", "time_outs"]:
                     continue
-                if not isinstance(task_data, dict) or "mean_reward" not in task_data:
+                if not isinstance(task_data, dict):
                     continue
-                task_name = task_data.get("task_name", task_key)
-                mean_rew = task_data["mean_reward"]
-                self.writer.add_scalar(f"Rewards/{task_name}/mean", mean_rew, self.current_learning_iteration)
 
-                # log sub-terms silently
+                task_name = task_data.get("task_name", task_key)
+                mean_rew = task_data.get("mean_reward", float("nan"))
+                mean_ep_rew = task_data.get("mean_episode_reward", float("nan"))
+                mean_ep_len = task_data.get("mean_episode_length", float("nan"))
+
+                # --- per-step mean reward ---
+                self.writer.add_scalar(f"Rewards/{task_name}/mean_per_step", mean_rew, self.current_learning_iteration)
+
+                # --- per-episode mean reward ---
+                self.writer.add_scalar(f"Rewards/{task_name}/mean_per_episode", mean_ep_rew, self.current_learning_iteration)
+
+                # --- per-episode mean length ---
+                self.writer.add_scalar(f"Rewards/{task_name}/mean_episode_length", mean_ep_len, self.current_learning_iteration)
+
+                # --- log all sub-terms silently (like before) ---
                 log_dict = task_data.get("log", {})
                 for term_name, term_value in log_dict.items():
                     if torch.is_tensor(term_value):
@@ -176,7 +196,6 @@ class MyOnPolicyRunner(OnPolicyRunner):
                         term_value,
                         self.current_learning_iteration,
                     )
-
 
 
 

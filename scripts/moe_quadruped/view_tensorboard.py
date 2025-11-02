@@ -5,23 +5,6 @@ import os
 
 
 
-from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-
-# Path to your TensorBoard event file or directory
-event_path = r"logs\rsl_rl\unitree_go2_flat\2025-10-30_11-23-05_run21_mt32\events.out.tfevents.1761819790.ASUSROG16.38932.0"
-
-
-# Load events
-ea = EventAccumulator(event_path)
-ea.Reload()
-
-# Print all available scalar tags
-print("Available scalar tags:")
-for tag in ea.Tags().get("scalars", []):
-    print("-", tag)
-
-exit(0)
-
 
 def analyze_tfevents(event_file: str):
     if not os.path.exists(event_file):
