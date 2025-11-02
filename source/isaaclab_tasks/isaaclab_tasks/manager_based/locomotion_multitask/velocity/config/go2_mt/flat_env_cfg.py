@@ -10,6 +10,7 @@ from .rough_env_cfg import UnitreeGo2RoughEnvCfg
 
 @configclass
 class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
+
     def __post_init__(self):
         # post init of parent
         super().__post_init__()
@@ -24,8 +25,8 @@ class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
         self.scene.terrain.terrain_generator = None
         """
         self.scene.world_terrain.terrain_type = "plane"
-        self.scene.world_terrain.terrain_generator = None       
-        
+        self.scene.world_terrain.terrain_generator = None
+
         # no height scan
         self.scene.height_scanner = None
         self.observations.policy.height_scan = None
@@ -33,10 +34,8 @@ class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
         self.curriculum.terrain_levels = None
 
 
-        
-
-
 class UnitreeGo2FlatEnvCfg_PLAY(UnitreeGo2FlatEnvCfg):
+
     def __post_init__(self) -> None:
         # post init of parent
         #super().__post_init__()

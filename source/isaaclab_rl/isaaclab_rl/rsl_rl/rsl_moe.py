@@ -20,6 +20,7 @@ from rsl_rl.modules import (
 
 
 class MyActorCritic(ActorCritic):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # add your custom layers or logic here
@@ -73,9 +74,8 @@ class MyOnPolicyRunner(OnPolicyRunner):
 
         # evaluate the policy class
         policy_class = eval(self.policy_cfg.pop("class_name"))
-        policy: MyActorCritic |ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
-            num_obs, num_privileged_obs, self.env.num_actions, **self.policy_cfg
-        ).to(self.device)
+        policy: MyActorCritic | ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
+            num_obs, num_privileged_obs, self.env.num_actions, **self.policy_cfg).to(self.device)
 
         # resolve dimension of rnd gated state
         if "rnd_cfg" in self.alg_cfg and self.alg_cfg["rnd_cfg"] is not None:
@@ -97,9 +97,10 @@ class MyOnPolicyRunner(OnPolicyRunner):
 
         # initialize algorithm
         alg_class = eval(self.alg_cfg.pop("class_name"))
-        self.alg: PPO | Distillation = alg_class(
-            policy, device=self.device, **self.alg_cfg, multi_gpu_cfg=self.multi_gpu_cfg
-        )
+        self.alg: PPO | Distillation = alg_class(policy,
+                                                 device=self.device,
+                                                 **self.alg_cfg,
+                                                 multi_gpu_cfg=self.multi_gpu_cfg)
 
         # store training configuration
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
@@ -107,9 +108,8 @@ class MyOnPolicyRunner(OnPolicyRunner):
         self.empirical_normalization = self.cfg["empirical_normalization"]
         if self.empirical_normalization:
             self.obs_normalizer = EmpiricalNormalization(shape=[num_obs], until=1.0e8).to(self.device)
-            self.privileged_obs_normalizer = EmpiricalNormalization(shape=[num_privileged_obs], until=1.0e8).to(
-                self.device
-            )
+            self.privileged_obs_normalizer = EmpiricalNormalization(shape=[num_privileged_obs],
+                                                                    until=1.0e8).to(self.device)
         else:
             self.obs_normalizer = torch.nn.Identity().to(self.device)  # no normalization
             self.privileged_obs_normalizer = torch.nn.Identity().to(self.device)  # no normalization
@@ -155,11 +155,9 @@ class MyOnPolicyRunner(OnPolicyRunner):
             mean_ep_len = task_data.get("mean_episode_length", float("nan"))
 
             # Log all metrics in the same aligned style as superclass
-            log_string += (
-                f"{task_name + ' (per-step):':>{pad}} {mean_rew:8.3f}\n"
-                f"{task_name + ' (episode):':>{pad}} {mean_ep_rew:8.3f}\n"
-                f"{task_name + ' (ep. length):':>{pad}} {mean_ep_len:8.1f}\n"
-            )
+            log_string += (f"{task_name + ' (per-step):':>{pad}} {mean_rew:8.3f}\n"
+                           f"{task_name + ' (episode):':>{pad}} {mean_ep_rew:8.3f}\n"
+                           f"{task_name + ' (ep. length):':>{pad}} {mean_ep_len:8.1f}\n")
 
         # --- print final block ---
         print(log_string)
@@ -181,10 +179,12 @@ class MyOnPolicyRunner(OnPolicyRunner):
                 self.writer.add_scalar(f"Rewards/{task_name}/mean_per_step", mean_rew, self.current_learning_iteration)
 
                 # --- per-episode mean reward ---
-                self.writer.add_scalar(f"Rewards/{task_name}/mean_per_episode", mean_ep_rew, self.current_learning_iteration)
+                self.writer.add_scalar(f"Rewards/{task_name}/mean_per_episode", mean_ep_rew,
+                                       self.current_learning_iteration)
 
                 # --- per-episode mean length ---
-                self.writer.add_scalar(f"Rewards/{task_name}/mean_episode_length", mean_ep_len, self.current_learning_iteration)
+                self.writer.add_scalar(f"Rewards/{task_name}/mean_episode_length", mean_ep_len,
+                                       self.current_learning_iteration)
 
                 # --- log all sub-terms silently (like before) ---
                 log_dict = task_data.get("log", {})
@@ -196,8 +196,6 @@ class MyOnPolicyRunner(OnPolicyRunner):
                         term_value,
                         self.current_learning_iteration,
                     )
-
-
 
     def _log_to_console(self, name: str, value: float, width: int, pad: int):
         print(f"{name:<{pad}} | {value:>{width - pad - 3}.3f}")

@@ -1,4 +1,4 @@
-# from https://github.com/meenalparakh/MT-IsaacLab, 
+# from https://github.com/meenalparakh/MT-IsaacLab,
 # credit to author https://github.com/meenalparakh
 
 # Copyright (c) 2022-2025, The Isaac Lab Project Developers.
@@ -155,22 +155,20 @@ class ManagerBasedMTRLEnv(gym.Env):
         self.action_space = self.example_env.action_space
 
         if self.cfg.append_task_id:
-            raise NotImplementedError(
-                "Appending task ID to the observation space is not implemented yet. "
-                "Please set `append_task_id` to False in the environment configuration."
-            )
+            raise NotImplementedError("Appending task ID to the observation space is not implemented yet. "
+                                      "Please set `append_task_id` to False in the environment configuration.")
             self.observation_space = wrap_observation_space(
                 self.observation_space,
                 addon_space=gym.spaces.Dict(
                     spaces={
-                        "task_id": gym.spaces.Box(
+                        "task_id":
+                        gym.spaces.Box(
                             low=0,
                             high=len(self.envs) - 1,
                             shape=(self.cfg.num_envs_per_task, 1),
                             dtype=np.int32,
                         )
-                    }
-                ),
+                    }),
             )
 
         self.single_observation_space = self.example_env.single_observation_space
@@ -251,7 +249,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         is_reset = False
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
-            
 
             task_env.curriculum_manager.compute(env_ids=None)
 
@@ -276,7 +273,6 @@ class ManagerBasedMTRLEnv(gym.Env):
             # -- reset envs that terminated/timed-out and log the episode information
             reset_env_ids = task_env.reset_buf.nonzero(as_tuple=False).squeeze(-1)
 
-
             if len(reset_env_ids) > 0:
 
                 # first record data, then reset
@@ -288,7 +284,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
                     if "episode" not in task_env.extras:
                         task_env.extras["episode"] = []
-                    
 
                     task_env.extras["episode"].append({
                         "task_name": task_name,
@@ -299,7 +294,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
                     # Reset accumulators for next episode
                     task_env._episode_reward_accum[env_id] = 0.0
-
 
                 task_env._reset_idx(reset_env_ids)
                 # -- update command
@@ -318,7 +312,6 @@ class ManagerBasedMTRLEnv(gym.Env):
             if self.sim.has_rtx_sensors() and self.cfg.rerender_on_reset:
                 self.sim.render()
 
-
         # concatenate the observations, rewards, resets and extras
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
@@ -327,7 +320,6 @@ class ManagerBasedMTRLEnv(gym.Env):
             all_reset_time_outs.append(task_env.reset_time_outs)
             all_obs[task_name] = task_env.obs_buf
 
-            
             # copy existing extras dict if available
             extras[task_name] = dict(task_env.extras)
             # add task metadata and mean rew. of task
@@ -349,7 +341,6 @@ class ManagerBasedMTRLEnv(gym.Env):
                 extras[task_name]["mean_episode_reward"] = float('nan')
                 extras[task_name]["mean_episode_length"] = float('nan')
 
-
         if self.cfg.concatenate_step_results:
             # assumes that all environments have the same observation space
             self.reward_buf = torch.cat(all_rewards, dim=0)
@@ -363,18 +354,8 @@ class ManagerBasedMTRLEnv(gym.Env):
             self.reset_time_outs = torch.stack(all_reset_time_outs, dim=0)
             self.obs_buf = all_obs
 
-
-    
         # Return with episode info in the expected format
-        return (
-            self.obs_buf,
-            self.reward_buf,
-            self.reset_terminated,
-            self.reset_time_outs,
-            extras
-        )
-    
-    
+        return (self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, extras)
 
     def _reset_idx(self, task_name, env_ids: Sequence[int]):
         """Reset environments based on specified indices.
@@ -445,9 +426,10 @@ class ManagerBasedMTRLEnv(gym.Env):
         # set seed for torch and other libraries
         return torch_utils.set_seed(seed)
 
-    def reset(
-        self, seed: int | None = None, env_ids: list[Sequence[int]] | None = None, options: dict[str, Any] | None = None
-    ):
+    def reset(self,
+              seed: int | None = None,
+              env_ids: list[Sequence[int]] | None = None,
+              options: dict[str, Any] | None = None):
         """Resets the specified environments and returns observations.
 
         This function calls the :meth:`_reset_idx` function to reset the specified environments.
@@ -528,16 +510,14 @@ class ManagerBasedMTRLEnv(gym.Env):
                     f"Cannot render '{self.render_mode}' when the simulation render mode is"
                     f" '{self.sim.render_mode.name}'. Please set the simulation render mode to:"
                     f"'{self.sim.RenderMode.PARTIAL_RENDERING.name}' or '{self.sim.RenderMode.FULL_RENDERING.name}'."
-                    " If running headless, make sure --enable_cameras is set."
-                )
+                    " If running headless, make sure --enable_cameras is set.")
             # create the annotator if it does not exist
             if not hasattr(self, "_rgb_annotator"):
                 import omni.replicator.core as rep
 
                 # create render product
-                self._render_product = rep.create.render_product(
-                    self.cfg.viewer.cam_prim_path, self.cfg.viewer.resolution
-                )
+                self._render_product = rep.create.render_product(self.cfg.viewer.cam_prim_path,
+                                                                 self.cfg.viewer.resolution)
                 # create rgb annotator -- used to read data from the render product
                 self._rgb_annotator = rep.AnnotatorRegistry.get_annotator("rgb", device="cpu")
                 self._rgb_annotator.attach([self._render_product])
@@ -554,8 +534,7 @@ class ManagerBasedMTRLEnv(gym.Env):
                 return rgb_data[:, :, :3]
         else:
             raise NotImplementedError(
-                f"Render mode '{self.render_mode}' is not supported. Please use: {self.metadata['render_modes']}."
-            )
+                f"Render mode '{self.render_mode}' is not supported. Please use: {self.metadata['render_modes']}.")
 
     def _get_observations(self):
         """Returns the current observations of the environment."""
