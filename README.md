@@ -151,6 +151,12 @@ C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\s
 ```
 
 
+Run diagnostics
+
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe .\scripts\moe_quadruped\plot_diagnostics.py --single .\logs\rsl_rl\unitree_go2_flat\2025-11-03_10-21-04_run28_st\ --multi .\logs\rsl_rl\unitree_go2_flat\2025-11-03_09-43-13_run26\
+```
+
 
 ### Remote (Ubuntu)
 

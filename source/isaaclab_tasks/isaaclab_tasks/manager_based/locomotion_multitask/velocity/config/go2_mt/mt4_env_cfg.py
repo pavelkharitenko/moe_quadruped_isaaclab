@@ -21,22 +21,24 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
     #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    #legStand2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+
 
     def __post_init__(self):
         """Post initialization."""
         # general settings
+        self.sim.dt = 0.005
         self.decimation = 4
         self.num_multi_task_envs = 2
         self.task_spacing = 20.0
         self.num_envs_per_task = 128
-        self.envs_spacing = 2.5
+        self.envs_spacing = 10.5
         self.append_task_id = False
         self.concatenate_step_results = True
 
         self.sim.render_interval = self.decimation
         self.episode_length_s = 20.0
         # simulation settings
-        self.sim.dt = 0.005
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
         # update sensor update periods
 
@@ -70,6 +72,8 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
             if scene.terrain.terrain_generator is not None:
                 scene.terrain.terrain_generator.curriculum = False
         """
+
+    
 
 
 """

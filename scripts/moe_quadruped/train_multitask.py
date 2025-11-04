@@ -162,6 +162,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
     
     # create runner from rsl-rl
+    #agent_cfg["num_envs"]
     runner = MyOnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     
     # write git state to logs
@@ -177,6 +178,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+
+    # TODO debug num envs
+
+    #print("Env num_envs (wrapper):", env.num_envs)
+    #print("Runner num_envs:", runner.num_envs)
+    #print("Total envs observed by policy:", env.num_envs_total if hasattr(env, 'num_envs_total') else env.num_envs)
+
 
 
     # run training

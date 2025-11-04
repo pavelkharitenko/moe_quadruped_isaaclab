@@ -211,6 +211,13 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         # -- reward computation
         self.reward_buf = self.reward_manager.compute(dt=self.step_dt)
 
+        #print(" ################## reward manager comp. #####################")
+        #print(f"single env: reward mean {self.reward_buf.mean():.4f}, "
+        #f"std {self.reward_buf.std():.4f}, "
+        #f"sum {self.reward_buf.sum():.4f}")
+        #print("step dt", self.step_dt)
+        #print(" #########################################################")
+
         if len(self.recorder_manager.active_terms) > 0:
             # update observations for recording if needed
             self.obs_buf = self.observation_manager.compute()

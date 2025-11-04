@@ -53,8 +53,9 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         sim_cfg = SimulationCfg()
         sim_cfg.device = device
-
+        sim_cfg.dt = cfg.sim.dt
         self.sim: SimulationContext = SimulationContext(sim_cfg)
+
         self._sim_step_counter = 0
 
         self.sim.set_camera_view(cfg.viewer.eye, cfg.viewer.lookat)
@@ -85,7 +86,7 @@ class ManagerBasedMTRLEnv(gym.Env):
             rl_env_cfg.scene.env_spacing = cfg.envs_spacing
 
             # note (mt-isaac): collision filtering is handled outside the loop
-            rl_env_cfg.scene.filter_collisions = False
+            rl_env_cfg.scene.filter_collisions = True # TODO need to change back?
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
 
             env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
@@ -220,7 +221,7 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
 
-        # apply the
+        # apply the physics stepping
         for _ in range(self.cfg.decimation):
 
             self._sim_step_counter += 1
@@ -262,6 +263,15 @@ class ManagerBasedMTRLEnv(gym.Env):
 
             # -- reward computation
             task_env.reward_buf = task_env.reward_manager.compute(dt=self.step_dt)
+            
+            #print(" ################## reward manager comp. #####################")
+            #print(f"{task_name}: reward mean {task_env.reward_buf.mean():.4f}, "
+            #f"std {task_env.reward_buf.std():.4f}, "
+            #f"sum {task_env.reward_buf.sum():.4f}")
+            #print("step dt", self.step_dt)
+
+            #print(" #########################################################")
+
 
             # for episode statistics
             if not hasattr(task_env, "_episode_reward_accum"):

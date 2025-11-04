@@ -15,6 +15,7 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     save_interval = 50
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False
+    init_at_random_ep_len = False  # not supported for MT environments, check if this made any difference in single task
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
         actor_hidden_dims=[512, 256, 128],
