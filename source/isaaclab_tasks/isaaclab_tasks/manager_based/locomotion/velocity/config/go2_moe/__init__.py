@@ -79,6 +79,32 @@ gym.register(
     },
 )
 
+# bipedal walking
+gym.register(
+    id="Isaac-Bipedal-Unitree-Go2-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.bipedal_env_cfg:UnitreeGo2BipedalEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
+gym.register(
+    id="Isaac-Bipedal-Unitree-Go2-Play-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.bipedal_env_cfg:UnitreeGo2BipedalEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
+
+
+
 
 gym.register(
     id="Isaac-Tracking-Goal-Unitree-Go2-MoE-v0",
