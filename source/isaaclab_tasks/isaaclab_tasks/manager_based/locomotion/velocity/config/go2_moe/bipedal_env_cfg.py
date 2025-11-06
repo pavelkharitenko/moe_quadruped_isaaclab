@@ -10,11 +10,25 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import Re
 @configclass
 class UnitreeGo2BipedalRewardsCfg(RewardsCfg):
     # === STAND ===
-    orientation = RewTerm(func=bipedal_orientation, weight=3.0, params={"asset_cfg": SceneEntityCfg("robot")})
+    
+    orientation = RewTerm(
+        func=legstand_orientation_l2,
+        weight=-4.0,
+        params={"target_gravity": [-1.0, 0.0, 0.0]},  # adjust depending on base-up direction
+    )
+    
+    
+    
     base_height_linear = RewTerm(
         func=bipedal_base_height_linear,
-        weight=1.8,
-        params={"asset_cfg": SceneEntityCfg("robot"), "Tmin": 0.15, "Tmax": 0.35},
+        weight=5.0,
+        params={"asset_cfg": SceneEntityCfg("robot"), "Tmin": 0.15, "Tmax": 0.85},
+    )
+
+    rear_leg_straight = RewTerm(
+        func=bipedal_rear_leg_straight,
+        weight=3.0,
+        params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
     # === TRACKING ===
@@ -29,22 +43,28 @@ class UnitreeGo2BipedalRewardsCfg(RewardsCfg):
         params={"target_ang_vel": [0.0, 0.0, 0.2], "sigma": 0.25},
     )
     termination = RewTerm(func=bipedal_termination, weight=-1.0)
-    alive = RewTerm(func=bipedal_alive, weight=1.0)
+    alive = RewTerm(func=bipedal_alive, 
+                    #weight=1.0
+                    weight=0.0
+                    )
 
     # === REGULARIZATION ===
-    rear_air = RewTerm(
-        func=bipedal_rear_air,
-        weight=-0.5,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["RL_foot", "RR_foot"])},
+    rear_ground_front_air = RewTerm(
+        func=bipedal_rear_legstand,
+        weight=3.5,
+        params={"sensor_cfg_rear": SceneEntityCfg("contact_forces", body_names=["RL_foot", "RR_foot"]),
+                "sensor_cfg_front": SceneEntityCfg("contact_forces", body_names=["FL_foot", "FR_foot"])},
     )
     front_hip_pos = RewTerm(
         func=bipedal_hip_pos,
-        weight=-0.1,
+        #weight=-0.1,
+        weight=0.0,
         params={"asset_cfg": SceneEntityCfg("robot"), "side": "F"},
     )
     rear_hip_pos = RewTerm(
         func=bipedal_hip_pos,
-        weight=-0.18,
+        weight=0.0,
+        #weight=-0.18,
         params={"asset_cfg": SceneEntityCfg("robot"), "side": "R"},
     )
     rear_pos_balance = RewTerm(
@@ -69,15 +89,20 @@ class UnitreeGo2BipedalRewardsCfg(RewardsCfg):
     )
     legs_energy_substeps = RewTerm(
         func=bipedal_legs_energy_substeps,
-        weight=-1e-6,
+        #weight=-1e-6,
+        weight=0.0,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
     torque_exceed_limits = RewTerm(
         func=bipedal_torque_exceed_limits,
-        weight=-2.0,
+        #weight=-2.0,
+        weight=0.0,
         params={"asset_cfg": SceneEntityCfg("robot"), "limit": 30.0},
     )
-    joint_limits = RewTerm(func=bipedal_joint_limits, weight=-0.06, params={"asset_cfg": SceneEntityCfg("robot")})
+    joint_limits = RewTerm(func=bipedal_joint_limits, 
+                           #weight=-0.06, 
+                           weight=0.0,
+                           params={"asset_cfg": SceneEntityCfg("robot")})
     collision = RewTerm(
         func=bipedal_collision,
         weight=-0.06,
@@ -94,9 +119,9 @@ class UnitreeGo2BipedalEnvCfg(UnitreeGo2FlatEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.rewards.flat_orientation_l2.weight = 0.0
-        self.rewards.feet_air_time.weight = 0.0
-        self.rewards.track_lin_vel_xy_exp.weight = 0.0
-        self.rewards.track_ang_vel_z_exp.weight = 0.0
+        #self.rewards.feet_air_time.weight = 0.0
+        #self.rewards.track_lin_vel_xy_exp.weight = 0.0
+        #self.rewards.track_ang_vel_z_exp.weight = 0.0
 
         # Flat terrain for balance learning
         self.scene.terrain.terrain_type = "plane"

@@ -48,12 +48,12 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         self.cfg = cfg
         self._is_closed = False
-
+        
         self.envs: dict[str, ManagerBasedRLEnv] = {}
-
         sim_cfg = SimulationCfg()
         sim_cfg.device = device
         sim_cfg.dt = cfg.sim.dt
+        sim_cfg.physics_prim_path = cfg.sim.physics_prim_path
         self.sim: SimulationContext = SimulationContext(sim_cfg)
 
         self._sim_step_counter = 0
@@ -87,7 +87,13 @@ class ManagerBasedMTRLEnv(gym.Env):
 
             # note (mt-isaac): collision filtering is handled outside the loop
             rl_env_cfg.scene.filter_collisions = True # TODO need to change back?
+            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            print("TaskName:", task_name)
+            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
+
+
 
             env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
 
@@ -133,6 +139,11 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         self.set_observation_action_spaces()
         self.render_mode = render_mode
+
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        #print("ManagerBasedRLEnv.episode_length_buf.shape:", self.cfg.)
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
     def extract_tasks(self):
         task_configs = {}
@@ -202,7 +213,7 @@ class ManagerBasedMTRLEnv(gym.Env):
 
     @property
     def max_episode_length_s(self):
-        return max([env.max_episode_length for env in self.envs.values()])
+        return max([env.max_episode_length_s for env in self.envs.values()])
 
     @property
     def max_episode_length(self):

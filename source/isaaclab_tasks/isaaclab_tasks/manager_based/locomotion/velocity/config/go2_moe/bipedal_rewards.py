@@ -34,12 +34,37 @@ def get_default_joint_tensor(asset, device, defaults_dict):
 
 
 # === BIPEDAL STAND ===
+
+def legstand_orientation_l2(
+    env: ManagerBasedRLEnv,
+    target_gravity: list[float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize deviation of robot's base orientation from target (projected gravity).
+    For legstand we want base upright, so use target_gravity=[1, 0, 0] or similar."""
+    
+    asset: RigidObject = env.scene[asset_cfg.name]
+    target = torch.tensor(target_gravity, device=env.device)
+    
+    return torch.sum(torch.square(asset.data.projected_gravity_b - target), dim=1)
+
+
+"""
 def bipedal_orientation(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
     g_proj = asset.data.projected_gravity_b
     theta = torch.arccos(torch.clamp(g_proj[:, 2], -1.0, 1.0))
     return (0.5 * torch.cos(theta) + 0.5) ** 2
+"""
 
+def orientation_cosine_reward(env, asset_cfg, target_gravity=[-1,0,0]):
+    asset: RigidObject = env.scene[asset_cfg.name]
+    g_proj = asset.data.projected_gravity_b
+    target = torch.tensor(target_gravity, device=env.device)
+    g_proj = g_proj / g_proj.norm(dim=1, keepdim=True)
+    target = target / target.norm()
+    cos_sim = torch.sum(g_proj * target, dim=1)
+    return (0.5 * cos_sim + 0.5) ** 2  # reward in [0,1]
 
 def bipedal_base_height_linear(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, Tmin: float, Tmax: float) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
@@ -70,11 +95,74 @@ def bipedal_termination(env: ManagerBasedRLEnv) -> torch.Tensor:
 
 
 # === BIPEDAL REGULARIZATION ===
-def bipedal_rear_air(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
-    sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    contacts = sensor.data.net_forces_w[:, sensor_cfg.body_ids, 2] > 1.0
-    rear_air = (~contacts).all(dim=1).float()
-    return rear_air
+def bipedal_rear_legstand(
+    env: ManagerBasedRLEnv,
+    sensor_cfg_rear: SceneEntityCfg,
+    sensor_cfg_front: SceneEntityCfg,
+    max_force: float = 100.0,
+) -> torch.Tensor:
+    """
+    Dense rear leg stand reward:
+    - Encourages rear legs to carry weight (higher contact forces)
+    - Discourages front legs from supporting weight
+    """
+
+    scene = env.scene
+    rear_sensor: ContactSensor = scene.sensors[sensor_cfg_rear.name]
+    front_sensor: ContactSensor = scene.sensors[sensor_cfg_front.name]
+
+    # Extract vertical (z) contact forces
+    rear_forces = torch.clamp(rear_sensor.data.net_forces_w[:, sensor_cfg_rear.body_ids, 2], 0.0, max_force)
+    front_forces = torch.clamp(front_sensor.data.net_forces_w[:, sensor_cfg_front.body_ids, 2], 0.0, max_force)
+
+    # Normalize summed forces to [0,1]
+    rear_support = torch.sum(rear_forces, dim=1) / max_force
+    front_support = torch.sum(front_forces, dim=1) / max_force
+
+    # Reward higher when rear carries weight and front is light
+    reward = rear_support * (1.0 - torch.clamp(front_support, 0.0, 1.0))
+
+    return torch.clamp(reward, 0.0, 1.0)
+
+
+def bipedal_rear_leg_straight(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    target_angles: dict[str, float] = {
+        "RL_hip_joint": 0.0,
+        "RR_hip_joint": 0.0,
+        "RL_thigh_joint": 1.2,
+        "RR_thigh_joint": 1.2,
+        "RL_calf_joint": -2.2,
+        "RR_calf_joint": -2.2,
+    },
+    sigma: float = 0.5,
+) -> torch.Tensor:
+    """Reward rear legs for being straight (close to target angles).
+    Uses a Gaussian shape around desired joint angles for smoothness."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    joint_names = asset.data.joint_names
+    q = asset.data.joint_pos
+
+    # Create tensor of target angles aligned with joint order
+    target_q = torch.tensor(
+        [target_angles.get(n, 0.0) for n in joint_names],
+        device=env.device,
+        dtype=torch.float,
+    )
+
+    # Select only rear joints
+    rear_ids = [i for i, n in enumerate(joint_names) if n.startswith("RL_") or n.startswith("RR_")]
+
+    # Compute squared distance from target
+    diff = q[:, rear_ids] - target_q[rear_ids]
+    mse = torch.mean(diff ** 2, dim=1)
+
+    # Exponential falloff reward → 1.0 if perfectly aligned, smoothly decays as joints bend
+    reward = torch.exp(-mse / sigma)
+    return reward
+
+
 
 
 def bipedal_hip_pos(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, side: str) -> torch.Tensor:

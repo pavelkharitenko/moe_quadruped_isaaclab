@@ -17,7 +17,6 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
 
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
-
     flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
     #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
