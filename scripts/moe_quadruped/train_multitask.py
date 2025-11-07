@@ -188,7 +188,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
 
 
     # run training
-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=False)
+    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
     # close sim
     env.close()

@@ -138,6 +138,17 @@ Play Flat Task
 ```
 
 
+Train Bipedal Task
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_moe.py --task=Isaac-Bipedal-Unitree-Go2-MoE-v0  --num_envs=1024  --max_iterations=2000 --experiment_name=bipedal_go2_single --run_name=run30_st_bipedal               
+```
+
+Play Bipedal Task & Record
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\play_moe.py --task=Isaac-Bipedal-Unitree-Go2-Play-MoE-v0   --load_run=2025-11-06_10-26-36_run31_st_bipedal --video --video_length 200 --num_envs=12
+```
+
+
 
 Train task with custom RSL_RL train script:
 
@@ -149,6 +160,8 @@ Train in Multitask env:
 ```
 C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\scripts\moe_quadruped\train_multitask.py --task=Isaac-MT-Unitree-Go2-v0  --num_envs=38  --max_iterations=50 --experiment_name=flat_go2_mt --run_name=run19_mt
 ```
+
+
 
 
 Run diagnostics
@@ -179,6 +192,12 @@ Train Terrain Task
 python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Rough-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=3000 --experiment_name=terrain_go2_single --run_name=run19_terrain --headless
 ```
 
+
+Train Bipedal Task
+
+```
+python scripts/moe_quadruped/train_moe.py --task=Isaac-Bipedal-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=bipedal_go2_st --run_name=run31_st_bipedal --headless
+```
 
 ## Multitask Environment
 

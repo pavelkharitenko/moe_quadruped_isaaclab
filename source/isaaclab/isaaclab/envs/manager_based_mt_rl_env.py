@@ -140,11 +140,6 @@ class ManagerBasedMTRLEnv(gym.Env):
         self.set_observation_action_spaces()
         self.render_mode = render_mode
 
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-        #print("ManagerBasedRLEnv.episode_length_buf.shape:", self.cfg.)
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-
     def extract_tasks(self):
         task_configs = {}
         for task_name, task_cfg in self.cfg.__dict__.items():
@@ -274,15 +269,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
             # -- reward computation
             task_env.reward_buf = task_env.reward_manager.compute(dt=self.step_dt)
-            
-            #print(" ################## reward manager comp. #####################")
-            #print(f"{task_name}: reward mean {task_env.reward_buf.mean():.4f}, "
-            #f"std {task_env.reward_buf.std():.4f}, "
-            #f"sum {task_env.reward_buf.sum():.4f}")
-            #print("step dt", self.step_dt)
-
-            #print(" #########################################################")
-
 
             # for episode statistics
             if not hasattr(task_env, "_episode_reward_accum"):
@@ -375,6 +361,9 @@ class ManagerBasedMTRLEnv(gym.Env):
             self.reset_time_outs = torch.stack(all_reset_time_outs, dim=0)
             self.obs_buf = all_obs
 
+        # clear cache buffer
+        if hasattr(self, "_episode_length_buf_cache"):
+            self._episode_length_buf_cache = None
         # Return with episode info in the expected format
         return (self.obs_buf, self.reward_buf, self.reset_terminated, self.reset_time_outs, extras)
 
@@ -568,3 +557,30 @@ class ManagerBasedMTRLEnv(gym.Env):
             obs_dict = concatenate_observations(list(obs_dict.values()))
 
         return obs_dict
+
+
+    @property
+    def episode_length_buf(self):
+        """Concatenate per-task episode length buffers into a single tensor."""
+        if not hasattr(self, "_episode_length_buf_cache"):
+            # Concatenate all episode length buffers from subtasks
+            self._episode_length_buf_cache = torch.cat(
+                [env.episode_length_buf for env in self.envs.values()], dim=0
+            )
+        return self._episode_length_buf_cache
+
+    @episode_length_buf.setter
+    def episode_length_buf(self, value):
+        """Distribute a flattened tensor back into each subtask's buffer."""
+        # Split the input tensor into segments for each subtask
+        splits = []
+        start = 0
+        for env in self.envs.values():
+            n = env.episode_length_buf.shape[0]
+            splits.append(value[start:start + n])
+            start += n
+        # Write back to each sub-env’s episode_length_buf
+        for env, v in zip(self.envs.values(), splits):
+            env.episode_length_buf.copy_(v)
+        # Clear cache
+        self._episode_length_buf_cache = None
