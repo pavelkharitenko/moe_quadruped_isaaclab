@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from collections import deque
 import os
 import time
@@ -8,6 +9,7 @@ import csv
 
 import rsl_rl
 from rsl_rl.utils import store_code_state
+from rsl_rl.utils import resolve_nn_activation
 from rsl_rl.runners.on_policy_runner import OnPolicyRunner
 from rsl_rl.algorithms import PPO, Distillation
 from rsl_rl.env import VecEnv
@@ -28,6 +30,74 @@ class MyActorCritic(ActorCritic):
         print("#################################################")
         print(" Using Custom MyActorCritic")
         print("#################################################")
+
+
+
+
+class MoEActorCritic(ActorCritic):
+    """
+    ActorCritic with n expert Actor networks, and 1 Shared Critic network.
+    Softmax is applied on the input, and forwarded to 
+    """
+    def __init__(
+        self,
+        num_actor_obs,
+        num_critic_obs,
+        num_actions,
+        num_experts=4,  # 🧠 number of expert actor networks
+        gating_hidden_dims=[128, 128],
+        actor_hidden_dims=[256, 256],
+        critic_hidden_dims=[256, 256],
+        activation="elu",
+        init_noise_std=1.0,
+        noise_std_type="scalar",
+        **kwargs,
+    ):
+        # call parent to build critic, and reuse its activation resolution
+        super().__init__(
+            num_actor_obs=num_actor_obs,
+            num_critic_obs=num_critic_obs,
+            num_actions=num_actions,
+            actor_hidden_dims=actor_hidden_dims,
+            critic_hidden_dims=critic_hidden_dims,
+            activation=activation,
+            init_noise_std=init_noise_std,
+            noise_std_type=noise_std_type,
+            **kwargs,
+        )
+
+
+        activation = resolve_nn_activation(activation)
+
+        self.num_experts = num_experts
+
+        # create experts
+        self.experts = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(num_actor_obs, actor_hidden_dims[0]),
+                activation,
+                *[layer for h_in, h_out in zip(actor_hidden_dims[:-1], actor_hidden_dims[1:])
+                  for layer in (nn.Linear(h_in, h_out), activation)],
+                nn.Linear(actor_hidden_dims[-1], num_actions)
+            )
+            for _ in range(num_experts)
+        ])
+
+
+        
+        # create gate network
+        gate_layers = []
+        gate_layers.append(nn.Linear(num_actor_obs, gating_hidden_dims[0]))
+        gate_layers.append(activation)
+        for i in range(len(gating_hidden_dims) -1 ):
+            gate_layers.append(nn.Linear(gating_hidden_dims[i], gating_hidden_dims[i + 1]))
+            gate_layers.append(activation)
+        
+        gate_layers.append(nn.Linear(gating_hidden_dims[-1], num_experts))
+
+        self.gating_network = nn.Sequential(*gate_layers)
+
+
 
 
 class MyOnPolicyRunner(OnPolicyRunner):
