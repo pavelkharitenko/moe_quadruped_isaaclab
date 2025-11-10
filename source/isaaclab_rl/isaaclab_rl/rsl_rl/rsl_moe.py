@@ -1,11 +1,14 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from collections import deque
 import os
 import time
 import statistics
 import pandas as pd
 import csv
+
+from torch.distributions import Normal
 
 import rsl_rl
 from rsl_rl.utils import store_code_state
@@ -26,10 +29,7 @@ class MyActorCritic(ActorCritic):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # add your custom layers or logic here
-        print("#################################################")
-        print(" Using Custom MyActorCritic")
-        print("#################################################")
+        # custom AC logic here
 
 
 
@@ -37,14 +37,14 @@ class MyActorCritic(ActorCritic):
 class MoEActorCritic(ActorCritic):
     """
     ActorCritic with n expert Actor networks, and 1 Shared Critic network.
-    Softmax is applied on the input, and forwarded to 
+    Softmax is applied on the input, and forwarded to all experts
     """
     def __init__(
         self,
         num_actor_obs,
         num_critic_obs,
         num_actions,
-        num_experts=4,  # 🧠 number of expert actor networks
+        num_experts=4,
         gating_hidden_dims=[128, 128],
         actor_hidden_dims=[256, 256],
         critic_hidden_dims=[256, 256],
@@ -97,8 +97,42 @@ class MoEActorCritic(ActorCritic):
 
         self.gating_network = nn.Sequential(*gate_layers)
 
+        print(f"Initialized MoEActorCritic with {num_experts} experts.")
+
+    def update_distribution(self, observations):
 
 
+        gating_logits = self.gating_network(observations)
+        gating_weights = F.softmax(gating_logits, dim=-1)
+        expert_means = torch.stack([expert(observations) for expert in self.experts], dim=1)
+
+        mean = torch.sum(gating_weights.unsqueeze(-1) * expert_means, dim=1)
+
+
+        if self.noise_std_type == "scalar":
+            std = self.std.expand_as(mean)
+        elif self.noise_std_type == "log":
+            std = torch.exp(self.log_std).expand_as(mean)
+        else:
+            raise ValueError(f"Unknown standard deviation type: {self.noise_std_type}. Should be 'scalar' or 'log'")
+        # create distribution
+        self.distribution = Normal(mean, std)
+
+
+    def act(self, observations, **kwargs):
+        self.update_distribution(observations)
+        return self.distribution.sample()
+    
+    def act_inference(self, observations):
+        
+        
+        gating_logits = self.gating_network(observations)
+        gating_weights = F.softmax(gating_logits, dim=-1)
+        expert_means = torch.stack([expert(observations) for expert in self.experts], dim=1)
+
+        mean = torch.sum(gating_weights.unsqueeze(-1) * expert_means, dim=1)
+
+        return mean
 
 class MyOnPolicyRunner(OnPolicyRunner):
     """On-policy runner for training and evaluation."""
@@ -145,7 +179,7 @@ class MyOnPolicyRunner(OnPolicyRunner):
 
         # evaluate the policy class
         policy_class = eval(self.policy_cfg.pop("class_name"))
-        policy: MyActorCritic | ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
+        policy: MoEActorCritic | MyActorCritic | ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
             num_obs, num_privileged_obs, self.env.num_actions, **self.policy_cfg).to(self.device)
 
         # resolve dimension of rnd gated state
@@ -205,6 +239,10 @@ class MyOnPolicyRunner(OnPolicyRunner):
         self.tot_time = 0
         self.current_learning_iteration = 0
         self.git_status_repos = [rsl_rl.__file__]
+
+        print(f"--- Policy type: {policy.__class__.__name__} ---")
+        if hasattr(policy, 'num_experts'):
+            print(f"Number of experts: {policy.num_experts}")
 
     def log(self, locs: dict, width: int = 80, pad: int = 35):
         # Call superclass logger (prints losses, mean reward, etc.)

@@ -179,6 +179,12 @@ Train Flat Task
 python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=flat_go2_single --run_name=run16 --headless
 ```
 
+Train Flat Task with MoE:
+
+```
+C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe scripts/moe_quadruped/train_single_moe.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=5 --experiment_name=flat_go2_single_moe --run_name=run35_single_moe --headless 
+```
+
 
 Train Legstand Task
 
