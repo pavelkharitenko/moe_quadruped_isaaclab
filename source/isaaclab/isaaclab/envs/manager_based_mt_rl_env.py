@@ -29,9 +29,7 @@ from .manager_based_mt_rl_env_cfg import ManagerBasedMTRLEnvCfg, TaskConfigs
 from .manager_based_rl_env import ManagerBasedRLEnv
 from .manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
 from .ui import ViewportCameraController
-from .utils.mtrl import concatenate_observations, get_environment_position_offsets, wrap_observation_space, add_task_id_to_obs
-
-
+from .utils.mtrl import concatenate_observations, get_environment_position_offsets, wrap_observation_space
 
 
 
@@ -78,8 +76,20 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         # create env of each task
         for task_idx, (task_name, task_cfg) in enumerate(self.task_configs.items()):
+            
+            print("----------------------------------------------------------")
+
+            print(self.cfg.base_dataclass_fields())
+            print("----------------------------------------------------------")
+            
+            
+            
 
             rl_env_cfg = ManagerBasedRLEnvCfg(**(self.cfg.base_dataclass_fields()), **(task_cfg.__dict__))
+
+            rl_env_cfg.task_id = task_idx
+            rl_env_cfg.num_multi_task_envs = self.cfg.num_multi_task_envs
+            
 
             # filter out the common scene elements, such as ground, etc, which belong to
             if task_idx > 0:
@@ -99,16 +109,12 @@ class ManagerBasedMTRLEnv(gym.Env):
             print("TaskName:", task_name)
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
-            print("rl_env_cfg:", rl_env_cfg)
-
-            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-
-
-
+            
+                
 
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
 
-            self.envs[task_name].observation_manager.
+            
 
             print("append_task_id:", self.cfg.append_task_id)
 
@@ -355,24 +361,6 @@ class ManagerBasedMTRLEnv(gym.Env):
         # concatenate the observations, rewards, resets and extras
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
-
-            # append task ids to observations if needed:
-            if self.cfg.append_task_id:
-                num_envs_in_task = task_env.obs_buf.shape[0]
-
-
-                # one hot vector:
-                task_id_vec = torch.zeros(
-                    (1, self.cfg.num_multi_task_envs),
-                    device=task_env.obs_buf.device,
-                    dtype=torch.float32
-                )
-
-                task_id_vec[0, task_idx] = 1.0
-
-                task_id_expanded = task_id_vec.expand(num_envs_in_task, -1)
-
-                task_env.obs_buf = torch.cat([task_env.obs_buf, task_id_expanded], dim=-1)
 
 
 

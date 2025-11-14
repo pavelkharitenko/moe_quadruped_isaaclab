@@ -83,6 +83,9 @@ class UnitreeGo2FlatEnvCfg(UnitreeGo2RoughEnvCfg):
         # no terrain curriculum
         self.curriculum.terrain_levels = None
 
+        
+        
+
         #self.terminations.base_contact.params["enabled"] = False
 
 

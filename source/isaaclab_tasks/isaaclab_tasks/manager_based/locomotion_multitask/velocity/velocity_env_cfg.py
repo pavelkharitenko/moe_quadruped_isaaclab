@@ -12,10 +12,12 @@ from isaaclab.envs import TaskConfigs
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
-
 from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+
+from isaaclab.envs.utils.mtrl import task_id_onehot
+
 
 import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 
@@ -37,9 +39,40 @@ from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG  # isort: skip
 
 
 ##
-# Scene definition
+# MT Observation
 ##
 
+from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import ObservationsCfg, ObsTerm
+
+
+
+@configclass
+class LocomotionVelocityObservationsCfg(ObservationsCfg):
+
+    # Policy group inherits everything from single-task
+    @configclass
+    class LocomotionVelocityPolicyCfg(ObservationsCfg.PolicyCfg):
+        # keep existing velocity, gravity, etc.
+
+        # MT Observation: task ID as one-hot
+        # assume your env has a property `task_id` which is an int from 0..num_tasks-1
+        task_id = ObsTerm(
+            func=task_id_onehot,
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    # observation groups
+    policy: LocomotionVelocityPolicyCfg = LocomotionVelocityPolicyCfg()
+
+
+
+
+##
+# Scene definition
+##
 
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
@@ -134,7 +167,7 @@ class LocomotionVelocityRoughEnvCfg(TaskConfigs):
     scene: MySceneCfg = MySceneCfg()
     #scene: MySceneCfg = MISSING
     # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
+    observations: LocomotionVelocityObservationsCfg = LocomotionVelocityObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings

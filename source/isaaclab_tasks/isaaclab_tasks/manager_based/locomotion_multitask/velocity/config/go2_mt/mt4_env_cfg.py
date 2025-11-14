@@ -48,6 +48,9 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         self.flatSceneInits(self.flatVel.scene)
         self.flatSceneInits(self.flatVel2.scene)
 
+
+        
+
     def flatSceneInits(self, scene):
         """No need in flatScene
         if scene.height_scanner is not None:

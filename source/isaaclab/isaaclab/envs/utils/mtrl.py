@@ -12,7 +12,8 @@ import gymnasium as gym
 import numpy as np
 import torch
 from gymnasium.error import CustomSpaceError
-
+from isaaclab.managers import ObservationTermCfg
+from dataclasses import dataclass
 
 def compute_grid_center_offset(
     square_dimensions: tuple[float, float],
@@ -198,32 +199,20 @@ def wrap_info(info, env_name):
     return info
 
 
-from omni.isaac.lab.sensors import ObservationBase
-import torch
+def task_id_onehot(env):
+    """Return one-hot vector representing the task ID."""
 
-class TaskIdObservation(ObservationBase):
-    """Adds a task ID vector to the observation."""
+    print("=================================================")
+    print(env.cfg)
+    print("=================================================")
 
-    def __init__(self, task_id: int, num_tasks: int, **kwargs):
-        super().__init__(**kwargs)
-        self.task_id = task_id
-        self.num_tasks = num_tasks
+    num_tasks = getattr(env.cfg, "num_multi_task_envs", 1)
 
-        # One-hot encoding
-        onehot = torch.zeros(num_tasks, dtype=torch.float32)
-        onehot[task_id] = 1.0
-        self.task_id_vec = onehot
+    print("has num_tasks_", num_tasks)
+    onehot = torch.zeros(num_tasks, device=env.device)
+    task_idx = getattr(env.cfg, "task_id", -1)
+    print("task_id has task_idx", task_idx)
 
-    def compute(self, env):
-        # Repeat for each environment instance inside this task
-        num_envs = env.num_envs
-        return self.task_id_vec.unsqueeze(0).repeat(num_envs, 1)
-
-
-
-def add_task_id_to_obs(self, task_index, num_tasks):
-    self.observation_manager.add_term(
-        name="task_id",
-        term=TaskIdObservation(task_index, num_tasks),
-        group="policy",
-    )
+    onehot[task_idx] = 1.0
+    print(onehot)
+    return onehot
