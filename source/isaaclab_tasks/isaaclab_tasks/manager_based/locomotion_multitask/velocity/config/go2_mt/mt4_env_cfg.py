@@ -32,7 +32,7 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         self.task_spacing = 20.0
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
-        self.append_task_id = False
+        self.append_task_id = True
         self.concatenate_step_results = True
 
         self.sim.render_interval = self.decimation

@@ -1,6 +1,8 @@
 # from https://github.com/meenalparakh/MT-IsaacLab, 
 # credit to author https://github.com/meenalparakh
 
+# extended to take one-hot encoded vector
+
 # Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #

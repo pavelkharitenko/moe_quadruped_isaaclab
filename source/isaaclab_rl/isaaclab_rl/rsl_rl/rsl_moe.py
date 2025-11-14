@@ -69,6 +69,7 @@ class MoEActorCritic(ActorCritic):
 
         activation = resolve_nn_activation(activation)
 
+
         self.num_experts = num_experts
 
         # create experts
@@ -83,8 +84,6 @@ class MoEActorCritic(ActorCritic):
             for _ in range(num_experts)
         ])
 
-
-        
         # create gate network
         gate_layers = []
         gate_layers.append(nn.Linear(num_actor_obs, gating_hidden_dims[0]))
@@ -99,15 +98,13 @@ class MoEActorCritic(ActorCritic):
 
         print(f"Initialized MoEActorCritic with {num_experts} experts.")
 
+
+
     def update_distribution(self, observations):
-
-
         gating_logits = self.gating_network(observations)
         gating_weights = F.softmax(gating_logits, dim=-1)
         expert_means = torch.stack([expert(observations) for expert in self.experts], dim=1)
-
         mean = torch.sum(gating_weights.unsqueeze(-1) * expert_means, dim=1)
-
 
         if self.noise_std_type == "scalar":
             std = self.std.expand_as(mean)
