@@ -18,9 +18,9 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     
     append_task_id: bool = False # set via cli args, e.g. --append_task_id True, for consistent RL alg. as well
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
-    flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
+    #flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
-    #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
     #legStand2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
 
@@ -47,7 +47,7 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # scale down the terrains because the robot is small
 
         self.flatSceneInits(self.flatVel.scene)
-        self.flatSceneInits(self.flatVel2.scene)
+        self.flatSceneInits(self.legStand.scene)
 
 
         
