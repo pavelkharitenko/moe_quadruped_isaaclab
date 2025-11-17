@@ -324,6 +324,7 @@ class ManagerBasedMTRLEnv(gym.Env):
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
 
+            """ debug obs structure
             print("\n================= OBS DEBUG =================")
             print(f"Task: {task_name}   (task_id={task_idx})")
 
@@ -342,7 +343,7 @@ class ManagerBasedMTRLEnv(gym.Env):
                 if value.shape[-1] == num_tasks:
                     print(f"    (maybe task-id one-hot): {value[0]}")
             print("=============================================\n")
-
+            """
 
 
             all_rewards.append(task_env.reward_buf)

@@ -93,12 +93,11 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
 
         print("[INFO]: Completed setting up the environment...")
 
+        """ debug ep buffer shape
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
         print("ManagerBasedRLEnv.episode_length_buf.shape:", self.episode_length_buf.shape)
-        print("ManagerBasedRLEnv.max_episdode_length_s:", self.max_episode_length_s)
-        print("ManagerBasedRLEnv.max_episdode_length:", self.max_episode_length)
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        """
 
     """
     Properties.

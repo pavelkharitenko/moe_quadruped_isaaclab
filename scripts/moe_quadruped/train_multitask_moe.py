@@ -16,6 +16,8 @@ parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy 
 parser.add_argument(
     "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
 )
+parser.add_argument("--append_task_id", action="store_true", default=False, help="Insert onehot encoded vector to each task of dim. num_tasks")
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -98,8 +100,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | ManagerBasedMTRLEnvCfg | DirectRLEnvCfg
     # override configurations with non-hydra CLI arguments
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
 
+    # in MT case, add num_envs_per_task and append_task_id args to config
     if isinstance(env_cfg, ManagerBasedMTRLEnvCfg):
         env_cfg.num_envs_per_task = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.num_envs_per_task
+        env_cfg.append_task_id = args_cli.append_task_id
+        agent_cfg.policy.append_task_id = args_cli.append_task_id
     else:
         env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
 
