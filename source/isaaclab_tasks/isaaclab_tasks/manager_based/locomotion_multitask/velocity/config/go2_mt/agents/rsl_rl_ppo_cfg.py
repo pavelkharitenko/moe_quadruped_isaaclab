@@ -16,7 +16,7 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False
     init_at_random_ep_len = True  # if supported for MT environments (yes supported)
-    append_task_id = True
+    append_task_id = False # set via cli args, e.g. --append_task_id True, so MT environment also respects this option
 
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,

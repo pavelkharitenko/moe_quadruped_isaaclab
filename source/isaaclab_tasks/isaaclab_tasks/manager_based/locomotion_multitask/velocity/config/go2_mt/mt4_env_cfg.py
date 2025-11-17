@@ -15,7 +15,8 @@ from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
 @configclass
 class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
-
+    
+    append_task_id: bool = False # set via cli args, e.g. --append_task_id True, for consistent RL alg. as well
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
     flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
@@ -32,7 +33,7 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         self.task_spacing = 20.0
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
-        self.append_task_id = True
+        #self.append_task_id = True
         self.concatenate_step_results = True
 
         self.sim.render_interval = self.decimation

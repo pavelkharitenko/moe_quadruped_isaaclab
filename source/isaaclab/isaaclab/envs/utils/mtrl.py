@@ -202,14 +202,19 @@ def wrap_info(info, env_name):
 
 
 def task_id_onehot(env):
+
+    # if not set or set to False, we ignore and provide 0-tensor, which will be dropped by Observation Manager
+    if not getattr(env.cfg, "append_task_id", False):
+        return torch.zeros((env.num_envs, 0), device=env.device)
+
+    # check how many tasks we have
     num_tasks = getattr(env.cfg, "num_multi_task_envs", 1)
 
-    # this is the SINGLE task index for this environment instance
-    # (e.g., task0 → 0, task1 → 1)
+    # get task index for this environment instance (e.g. task1 is zero, task2 is one, etc)
     if not hasattr(env.cfg, "task_id"):
         return torch.zeros((env.num_envs, num_tasks), device=env.device)
 
-    task_idx = env.cfg.task_id   # this is an int
+    task_idx = env.cfg.task_id   # this is an integer (0,1,...)
 
     # expand to shape (num_envs,)
     task_ids = torch.full(

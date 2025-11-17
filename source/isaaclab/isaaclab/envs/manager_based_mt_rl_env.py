@@ -79,9 +79,12 @@ class ManagerBasedMTRLEnv(gym.Env):
     
             rl_env_cfg = ManagerBasedRLEnvCfg(**(self.cfg.base_dataclass_fields()), **(task_cfg.__dict__))
 
+            rl_env_cfg.append_task_id = self.cfg.append_task_id
 
-            rl_env_cfg.task_id = task_idx
-            rl_env_cfg.num_multi_task_envs = self.cfg.num_multi_task_envs
+            if self.cfg.append_task_id:
+                # if onehot encoded task id vector needed, set ObsTerm of env properly:
+                rl_env_cfg.task_id = task_idx
+                rl_env_cfg.num_multi_task_envs = self.cfg.num_multi_task_envs
             
 
             # filter out the common scene elements, such as ground, etc, which belong to
@@ -321,6 +324,24 @@ class ManagerBasedMTRLEnv(gym.Env):
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
 
+            print("\n================= OBS DEBUG =================")
+            print(f"Task: {task_name}   (task_id={task_idx})")
+
+            for key, value in task_env.obs_buf.items():
+                print(f"  • Obs key: '{key}'")
+                print(f"    shape: {value.shape}")
+
+                # sample values from first env
+                if value.ndim >= 2:
+                    print(f"    sample[0, :10]: {value[0, -10:]}")
+                else:
+                    print(f"    sample[:10]: {value[-10:]}")
+
+                # If this entry contains the task id
+                num_tasks = self.cfg.num_multi_task_envs
+                if value.shape[-1] == num_tasks:
+                    print(f"    (maybe task-id one-hot): {value[0]}")
+            print("=============================================\n")
 
 
 
