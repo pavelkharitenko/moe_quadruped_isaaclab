@@ -129,5 +129,6 @@ def analyze_tfevents_multitask(event_file: str, max_extra_plots: int = 8):
 
 
 if __name__ == "__main__":
-    event_file = r"logs\rsl_rl\unitree_go2_flat\2025-11-02_09-31-05_run25_mt\events.out.tfevents.1762072273.ASUSROG16.32284.0"
+    #event_file = r"logs\rsl_rl\unitree_go2_flat\2025-11-02_09-31-05_run25_mt\events.out.tfevents.1762072273.ASUSROG16.32284.0"
+    event_file = r"logs\rsl_rl\unitree_go2_flat\2025-11-17_09-57-10_run37_mt_moe_ti\events.out.tfevents.1763369838.ASUSROG16.34660.0"
     analyze_tfevents_multitask(event_file)
