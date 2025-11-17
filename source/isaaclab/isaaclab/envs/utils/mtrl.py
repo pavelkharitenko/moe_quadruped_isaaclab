@@ -15,6 +15,8 @@ from gymnasium.error import CustomSpaceError
 from isaaclab.managers import ObservationTermCfg
 from dataclasses import dataclass
 
+from torch.nn.functional import one_hot
+
 def compute_grid_center_offset(
     square_dimensions: tuple[float, float],
     grid_shape: tuple[int, int],
@@ -200,19 +202,24 @@ def wrap_info(info, env_name):
 
 
 def task_id_onehot(env):
-    """Return one-hot vector representing the task ID."""
-
-    print("=================================================")
-    print(env.cfg)
-    print("=================================================")
-
     num_tasks = getattr(env.cfg, "num_multi_task_envs", 1)
 
-    print("has num_tasks_", num_tasks)
-    onehot = torch.zeros(num_tasks, device=env.device)
-    task_idx = getattr(env.cfg, "task_id", -1)
-    print("task_id has task_idx", task_idx)
+    # this is the SINGLE task index for this environment instance
+    # (e.g., task0 → 0, task1 → 1)
+    if not hasattr(env.cfg, "task_id"):
+        return torch.zeros((env.num_envs, num_tasks), device=env.device)
 
-    onehot[task_idx] = 1.0
-    print(onehot)
+    task_idx = env.cfg.task_id   # this is an int
+
+    # expand to shape (num_envs,)
+    task_ids = torch.full(
+        (env.num_envs,),
+        task_idx,
+        dtype=torch.long,
+        device=env.device,
+    )
+
+    # now make one-hot (num_envs, num_tasks)
+    onehot = torch.nn.functional.one_hot(task_ids, num_classes=num_tasks).float()
     return onehot
+

@@ -76,16 +76,9 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         # create env of each task
         for task_idx, (task_name, task_cfg) in enumerate(self.task_configs.items()):
-            
-            print("----------------------------------------------------------")
-
-            print(self.cfg.base_dataclass_fields())
-            print("----------------------------------------------------------")
-            
-            
-            
-
+    
             rl_env_cfg = ManagerBasedRLEnvCfg(**(self.cfg.base_dataclass_fields()), **(task_cfg.__dict__))
+
 
             rl_env_cfg.task_id = task_idx
             rl_env_cfg.num_multi_task_envs = self.cfg.num_multi_task_envs
@@ -108,19 +101,14 @@ class ManagerBasedMTRLEnv(gym.Env):
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
             print("TaskName:", task_name)
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-
-            
-                
+          
 
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
+            env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
 
             
 
-            print("append_task_id:", self.cfg.append_task_id)
-
-
-
-            env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
+            #print("append_task_id:", self.cfg.append_task_id)
 
         example_env = list(self.envs.values())[0]
         self.example_env = example_env
@@ -188,35 +176,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         self.single_observation_space = self.example_env.single_observation_space
         self.single_action_space = self.example_env.single_action_space
-
-        print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-        print("original self.observation_space shape (exp_env.obs_space)", self.observation_space)
-        print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-        print("original self.single_observation_space shape (exp_env.single_obs_space)", self.single_observation_space)  
-       
-
-        if self.cfg.append_task_id:
-
-            base_dim = self.single_observation_space["policy"].shape[0]
-            taks_id_dim = self.cfg.num_multi_task_envs
-            new_dim = base_dim + taks_id_dim
-
-
-            self.single_observation_space["policy"] = gym.spaces.Box(
-                low=-np.inf, high=np.inf, shape=(new_dim,), dtype=np.float32
-            )
-
-            self.observation_space["policy"] = gym.spaces.Box(
-                low=-np.inf, high=np.inf, shape=(self.observation_space["policy"].shape[0], new_dim), dtype=np.float32
-            )
-
-        print("observation spaces after appending task ids:")
-        print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-        print("original self.observation_space shape (exp_env.obs_space)", self.observation_space)
-        print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-        print("original self.single_observation_space shape (exp_env.single_obs_space)", self.single_observation_space) 
-            
-            
 
 
 

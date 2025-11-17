@@ -52,7 +52,6 @@ class LocomotionVelocityObservationsCfg(ObservationsCfg):
     # Policy group inherits everything from single-task
     @configclass
     class LocomotionVelocityPolicyCfg(ObservationsCfg.PolicyCfg):
-        # keep existing velocity, gravity, etc.
 
         # MT Observation: task ID as one-hot
         # assume your env has a property `task_id` which is an int from 0..num_tasks-1
