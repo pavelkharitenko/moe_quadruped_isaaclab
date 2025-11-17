@@ -5,7 +5,7 @@
 
 import math
 from dataclasses import MISSING
-
+import torch
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import TaskConfigs

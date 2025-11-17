@@ -85,7 +85,21 @@ class ManagerBasedMTRLEnv(gym.Env):
                 # if onehot encoded task id vector needed, set ObsTerm of env properly:
                 rl_env_cfg.task_id = task_idx
                 rl_env_cfg.num_multi_task_envs = self.cfg.num_multi_task_envs
-            
+
+                # ➜ cache one-hot vector (shape: num_tasks)
+                vec = torch.zeros(self.cfg.num_multi_task_envs, dtype=torch.float32, device=device)
+                vec[task_idx] = 1.0
+                rl_env_cfg._task_onehot = vec
+
+                # ➜ expanded version per-env (shape: num_envs_per_task × num_tasks)
+                rl_env_cfg._task_onehot_env = vec.repeat(self.cfg.num_envs_per_task, 1)
+            else:
+                # Zero-width observation (cached)
+                rl_env_cfg._task_onehot_env = torch.zeros(
+                    (self.cfg.num_envs_per_task, 0),
+                    dtype=torch.float32,
+                    device=device,
+                )
 
             # filter out the common scene elements, such as ground, etc, which belong to
             if task_idx > 0:
@@ -582,6 +596,34 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         return obs_dict
 
+    def _build_task_id_cache(self):
+        """Precompute onehot task-id tensors for each task."""
+        
+        append = getattr(self.cfg, "append_task_id", False)
+        device = self.sim.device
+        num_tasks = self.cfg.num_multi_task_envs
+        num_envs_per_task = self.cfg.num_envs_per_task
+
+        # empty tensor when disabled
+        self._task_id_empty = torch.zeros((num_envs_per_task, 0), device=device)
+
+        # If disabled, create empty entries for every task
+        if not append:
+            self._task_id_onehots = [
+                self._task_id_empty for _ in range(num_tasks)
+            ]
+            return
+
+        # Otherwise, build one-hot for each task index
+        self._task_id_onehots = []
+        for tid in range(num_tasks):
+            v = torch.zeros((num_tasks,), device=device)
+            v[tid] = 1.0
+            # Expand to (num_envs_per_task, num_tasks)
+            self._task_id_onehots.append(v.expand(num_envs_per_task, num_tasks).clone())
+
+        print("[MT] Built task-id onehot cache:", [x.shape for x in self._task_id_onehots])
+
 
     @property
     def episode_length_buf(self):
@@ -608,3 +650,5 @@ class ManagerBasedMTRLEnv(gym.Env):
             env.episode_length_buf.copy_(v)
         # Clear cache
         self._episode_length_buf_cache = None
+
+
