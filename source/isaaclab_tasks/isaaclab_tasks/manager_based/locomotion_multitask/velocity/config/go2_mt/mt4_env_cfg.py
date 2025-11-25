@@ -10,19 +10,20 @@ from isaaclab.utils import configclass
 from .flat_env_cfg import UnitreeGo2FlatEnvCfg
 from .rough_env_cfg import UnitreeGo2RoughEnvCfg
 from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
+import torch
 
 
 @configclass
 class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
     """Configuration for the reach end-effector pose tracking environment."""
-    
-    append_task_id: bool = False # set via cli args, e.g. --append_task_id True, for consistent RL alg. as well
-    #flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
+
+    append_task_id: bool = False  # set via cli args, e.g. --append_task_id True, for consistent RL alg. as well
+    flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
     #flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
     legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
-    legStand2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
+    #legStand2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
 
     def __post_init__(self):
         """Post initialization."""
@@ -46,11 +47,8 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
 
         # scale down the terrains because the robot is small
 
+        self.flatSceneInits(self.flatVel.scene)
         self.flatSceneInits(self.legStand.scene)
-        self.flatSceneInits(self.legStand2.scene)
-
-
-        
 
     def flatSceneInits(self, scene):
         """No need in flatScene
@@ -75,8 +73,6 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
             if scene.terrain.terrain_generator is not None:
                 scene.terrain.terrain_generator.curriculum = False
         """
-
-    
 
 
 """

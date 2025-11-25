@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 
-def analyze_tfevents(event_file: str):
+def analyze_tfevents(event_file: str, ignore_last_k: int = 0):
     if not os.path.exists(event_file):
         raise FileNotFoundError(f"No such file: {event_file}")
 
@@ -35,6 +35,12 @@ def analyze_tfevents(event_file: str):
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
 
+    def trim(steps, values):
+        """Helper to drop last k iterations."""
+        if ignore_last_k > 0 and len(values) > ignore_last_k:
+            return steps[:-ignore_last_k], values[:-ignore_last_k]
+        return steps, values
+
     # --- Rewards subplot
     ax = axes[0]
     for tag in reward_tags:
@@ -42,15 +48,20 @@ def analyze_tfevents(event_file: str):
             events = ea.Scalars(tag)
             steps = np.array([e.step for e in events])
             values = np.array([e.value for e in events])
+
+            # --- APPLY IGNORE LAST K ---
+            steps, values = trim(steps, values)
+
             ax.plot(steps, values, label=f"{tag} (mean)")
-            print(
-                f"[INFO] {tag} mean reward stats: mean={values.mean():.2f}, max={values.max():.2f}, final={values[-1]:.2f}"
-            )
+
+            print(f"[INFO] {tag} mean reward stats: "
+                  f"mean={values.mean():.2f}, max={values.max():.2f}, final={values[-1]:.2f}")
 
     if reward_max_tag in available:
         events = ea.Scalars(reward_max_tag)
         steps = np.array([e.step for e in events])
         values = np.array([e.value for e in events])
+        steps, values = trim(steps, values)
         ax.plot(steps, values, "--", label=f"{reward_max_tag} (proxy max)")
 
     ax.set_ylabel("Reward")
@@ -65,35 +76,39 @@ def analyze_tfevents(event_file: str):
             events = ea.Scalars(tag)
             steps = np.array([e.step for e in events])
             values = np.array([e.value for e in events])
+            steps, values = trim(steps, values)
             ax.plot(steps, values, label=tag)
     ax.set_ylabel("Error / Penalty")
     ax.set_title("Tracking Errors & Penalties")
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    # --- Policy & value losses subplot (normalized)
+    # --- Policy & value losses subplot
     ax = axes[2]
     for tag in policy_tags:
         if tag in available:
             events = ea.Scalars(tag)
             steps = np.array([e.step for e in events])
             values = np.array([e.value for e in events])
-            # Normalize to [0,1]
+            steps, values = trim(steps, values)
+
             if values.max() > values.min():
                 values = (values - values.min()) / (values.max() - values.min())
+
             ax.plot(steps, values, label=tag)
     ax.set_ylabel("Normalized Loss / Policy metric")
     ax.set_title("Policy & Value Losses (normalized)")
     ax.legend()
     ax.grid(True, linestyle="--", alpha=0.6)
 
-    # --- Timesteps / Performance subplot
+    # --- Performance subplot
     ax = axes[3]
     for tag in timestep_tags:
         if tag in available:
             events = ea.Scalars(tag)
             steps = np.array([e.step for e in events])
             values = np.array([e.value for e in events])
+            steps, values = trim(steps, values)
             ax.plot(steps, values, label=tag)
     ax.set_xlabel("Training steps")
     ax.set_ylabel("Time / FPS")
@@ -104,6 +119,7 @@ def analyze_tfevents(event_file: str):
     fig.suptitle("Training Analysis", fontsize=11)
     plt.tight_layout()
     plt.show()
+    plt.savefig('run_41_ppo_with_onehot_vec.png')
 
     # ---------------------
     # Plot Mean Episode Length
@@ -112,21 +128,23 @@ def analyze_tfevents(event_file: str):
         events = ea.Scalars("Train/mean_episode_length")
         steps = np.array([e.step for e in events])
         values = np.array([e.value for e in events])
+        steps, values = trim(steps, values)
 
         plt.figure(figsize=(10, 5))
-        plt.plot(steps, values, label="Train/mean_episode_length", color="tab:orange")
+        plt.plot(steps, values, label="Train/mean_episode_length")
         plt.xlabel("Training steps")
         plt.ylabel("Mean Episode Length")
         plt.title("Mean Episode Length per Training Step")
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend()
-        print(
-            f"[INFO] Train/mean_episode_length: mean={values.mean():.2f}, max={values.max():.2f}, final={values[-1]:.2f}"
-        )
+        print(f"[INFO] mean_episode_length: "
+              f"mean={values.mean():.2f}, max={values.max():.2f}, final={values[-1]:.2f}")
         plt.show()
         plt.savefig("mean_ep_length_flat_2000.png")
 
 
 if __name__ == "__main__":
-    event_file = r"logs/rsl_rl/unitree_go2_flat/2025-10-27_06-36-12_run18_legstand/events.out.tfevents.1761546988.lrz-server1.74911.0"
-    analyze_tfevents(event_file)
+    event_file = r"logs/rsl_rl/unitree_go2_flat/2025-11-25_06-09-22_run41_mt_ppo_fl_oh/events.out.tfevents.1764050993.lrz-server1.3600078.0"
+
+    # ignore last 200 iterations
+    analyze_tfevents(event_file, ignore_last_k=0)

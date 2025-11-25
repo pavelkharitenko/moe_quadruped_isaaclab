@@ -15,7 +15,6 @@ from gymnasium.error import CustomSpaceError
 from isaaclab.managers import ObservationTermCfg
 from dataclasses import dataclass
 
-from torch.nn.functional import one_hot
 
 def compute_grid_center_offset(
     square_dimensions: tuple[float, float],
@@ -81,9 +80,10 @@ def generate_centered_grid_positions(
     return centers
 
 
-def get_environment_position_offsets(
-    num_clones_per_env: int, num_environments: int, clone_spacing: float, environment_spacing: float = 5.0
-) -> list[np.ndarray]:
+def get_environment_position_offsets(num_clones_per_env: int,
+                                     num_environments: int,
+                                     clone_spacing: float,
+                                     environment_spacing: float = 5.0) -> list[np.ndarray]:
     """
     Compute center positions for placing multiple environment instances in a grid.
 
@@ -118,6 +118,7 @@ def get_environment_position_offsets(
 
 
 class ObservationDict(dict):
+
     def float(self):
         for k, v in self.items():
             self[k] = v.float()
@@ -150,10 +151,8 @@ def wrap_observation_space(observation_space, addon_space):
             merged_policy_spaces = dict(observation_space.spaces["policy"].spaces)
             for k, v in addon_space.spaces.items():
                 if k in merged_policy_spaces:
-                    raise CustomSpaceError(
-                        f"Key '{k}' already exists in the observation space. "
-                        "Please ensure that the keys in the addon space are unique."
-                    )
+                    raise CustomSpaceError(f"Key '{k}' already exists in the observation space. "
+                                           "Please ensure that the keys in the addon space are unique.")
                 merged_policy_spaces[k] = v
             # Rebuild the observation space with the merged policy dict
             new_spaces = dict(observation_space.spaces)
@@ -164,10 +163,8 @@ def wrap_observation_space(observation_space, addon_space):
             merged_spaces = dict(observation_space.spaces)
             for k, v in addon_space.spaces.items():
                 if k in merged_spaces:
-                    raise CustomSpaceError(
-                        f"Key '{k}' already exists in the observation space. "
-                        "Please ensure that the keys in the addon space are unique."
-                    )
+                    raise CustomSpaceError(f"Key '{k}' already exists in the observation space. "
+                                           "Please ensure that the keys in the addon space are unique.")
                 merged_spaces[k] = v
             return gym.spaces.Dict(merged_spaces)
     else:
@@ -203,4 +200,3 @@ def wrap_info(info, env_name):
 
 def task_id_onehot(env):
     return env.cfg._task_onehot_env
-

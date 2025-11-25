@@ -32,9 +32,6 @@ from .ui import ViewportCameraController
 from .utils.mtrl import concatenate_observations, get_environment_position_offsets, wrap_observation_space
 
 
-
-
-
 class ManagerBasedMTRLEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
@@ -51,7 +48,7 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         self.cfg = cfg
         self._is_closed = False
-        
+
         self.envs: dict[str, ManagerBasedRLEnv] = {}
         sim_cfg = SimulationCfg()
         sim_cfg.device = device
@@ -73,10 +70,9 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         env_prim_paths = []
 
-
         # create env of each task
         for task_idx, (task_name, task_cfg) in enumerate(self.task_configs.items()):
-    
+
             rl_env_cfg = ManagerBasedRLEnvCfg(**(self.cfg.base_dataclass_fields()), **(task_cfg.__dict__))
 
             rl_env_cfg.append_task_id = self.cfg.append_task_id
@@ -113,17 +109,14 @@ class ManagerBasedMTRLEnv(gym.Env):
             rl_env_cfg.scene.env_spacing = cfg.envs_spacing
 
             # note (mt-isaac): collision filtering is handled outside the loop
-            rl_env_cfg.scene.filter_collisions = True # TODO need to change back?
+            rl_env_cfg.scene.filter_collisions = True  # TODO need to change back?
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
             print("TaskName:", task_name)
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-          
 
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
             env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
-
-            
 
             #print("append_task_id:", self.cfg.append_task_id)
 
@@ -193,8 +186,6 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         self.single_observation_space = self.example_env.single_observation_space
         self.single_action_space = self.example_env.single_action_space
-
-
 
     @property
     def num_envs(self) -> int:
@@ -337,7 +328,6 @@ class ManagerBasedMTRLEnv(gym.Env):
         # concatenate the observations, rewards, resets and extras
         for task_idx, (task_name, task_env) in enumerate(self.envs.items()):
             task_env.obs_buf = task_env.observation_manager.compute()
-
             """ debug obs structure
             print("\n================= OBS DEBUG =================")
             print(f"Task: {task_name}   (task_id={task_idx})")
@@ -358,7 +348,6 @@ class ManagerBasedMTRLEnv(gym.Env):
                     print(f"    (maybe task-id one-hot): {value[0]}")
             print("=============================================\n")
             """
-
 
             all_rewards.append(task_env.reward_buf)
             all_reset_terminated.append(task_env.reset_terminated)
@@ -381,6 +370,8 @@ class ManagerBasedMTRLEnv(gym.Env):
 
                 extras[task_name]["mean_episode_reward"] = float(np.mean(ep_rewards))
                 extras[task_name]["mean_episode_length"] = float(np.mean(ep_lengths))
+
+                task_env.extras["episode"] = []
             else:
                 # No completed episodes yet — fill with NaN for logging consistency
                 extras[task_name]["mean_episode_reward"] = float('nan')
@@ -598,7 +589,7 @@ class ManagerBasedMTRLEnv(gym.Env):
 
     def _build_task_id_cache(self):
         """Precompute onehot task-id tensors for each task."""
-        
+
         append = getattr(self.cfg, "append_task_id", False)
         device = self.sim.device
         num_tasks = self.cfg.num_multi_task_envs
@@ -609,30 +600,25 @@ class ManagerBasedMTRLEnv(gym.Env):
 
         # If disabled, create empty entries for every task
         if not append:
-            self._task_id_onehots = [
-                self._task_id_empty for _ in range(num_tasks)
-            ]
+            self._task_id_onehots = [self._task_id_empty for _ in range(num_tasks)]
             return
 
         # Otherwise, build one-hot for each task index
         self._task_id_onehots = []
         for tid in range(num_tasks):
-            v = torch.zeros((num_tasks,), device=device)
+            v = torch.zeros((num_tasks, ), device=device)
             v[tid] = 1.0
             # Expand to (num_envs_per_task, num_tasks)
             self._task_id_onehots.append(v.expand(num_envs_per_task, num_tasks).clone())
 
         print("[MT] Built task-id onehot cache:", [x.shape for x in self._task_id_onehots])
 
-
     @property
     def episode_length_buf(self):
         """Concatenate per-task episode length buffers into a single tensor."""
         if not hasattr(self, "_episode_length_buf_cache"):
             # Concatenate all episode length buffers from subtasks
-            self._episode_length_buf_cache = torch.cat(
-                [env.episode_length_buf for env in self.envs.values()], dim=0
-            )
+            self._episode_length_buf_cache = torch.cat([env.episode_length_buf for env in self.envs.values()], dim=0)
         return self._episode_length_buf_cache
 
     @episode_length_buf.setter
@@ -650,5 +636,3 @@ class ManagerBasedMTRLEnv(gym.Env):
             env.episode_length_buf.copy_(v)
         # Clear cache
         self._episode_length_buf_cache = None
-
-
