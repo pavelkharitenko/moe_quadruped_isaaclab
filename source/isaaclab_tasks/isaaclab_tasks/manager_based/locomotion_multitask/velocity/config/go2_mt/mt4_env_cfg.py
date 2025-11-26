@@ -10,14 +10,14 @@ from isaaclab.utils import configclass
 from .flat_env_cfg import UnitreeGo2FlatEnvCfg
 from .rough_env_cfg import UnitreeGo2RoughEnvCfg
 from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
-import torch
 
 
 @configclass
 class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
-    """Configuration for the reach end-effector pose tracking environment."""
+    """Setup tasks to include in the multitask environment."""
 
     append_task_id: bool = False  # set via cli args, e.g. --append_task_id True, for consistent RL alg. as well
+
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
     #flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
 
@@ -27,14 +27,14 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
 
     def __post_init__(self):
         """Post initialization."""
-        # general settings
+        # general settings for all tasks
         self.sim.dt = 0.005
         self.decimation = 4
         self.num_multi_task_envs = 2
         self.task_spacing = 20.0
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
-        #self.append_task_id = True
+
         self.concatenate_step_results = True
 
         self.sim.render_interval = self.decimation

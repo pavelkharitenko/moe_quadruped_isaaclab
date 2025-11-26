@@ -9,12 +9,11 @@ from isaaclab.sensors import ContactSensor
 from isaaclab.envs import ManagerBasedRLEnv
 
 
-
 def legstand_feet_height_exp(
-    env: ManagerBasedRLEnv,
-    std: float,
-    target_height: float,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+        env: ManagerBasedRLEnv,
+        std: float,
+        target_height: float,
+        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
@@ -24,17 +23,25 @@ def legstand_feet_height_exp(
 
 
 def legstand_orientation_l2(
-    env: ManagerBasedRLEnv,
-    target_gravity: list[float],
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+        env: ManagerBasedRLEnv,
+        target_gravity: list[float],
+        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Penalize deviation of robot's base orientation from target (projected gravity).
     For legstand we want base upright, so use target_gravity=[1, 0, 0] or similar."""
-    
+
     asset: RigidObject = env.scene[asset_cfg.name]
     target = torch.tensor(target_gravity, device=env.device)
-    
-    return torch.sum(torch.square(asset.data.projected_gravity_b - target), dim=1)
+
+    #return torch.sum(torch.square(asset.data.projected_gravity_b - target), dim=1)
+
+    # prevent singular or large values
+    pg = asset.data.projected_gravity_b
+    pg = torch.nan_to_num(pg, 0.0)
+    pg = torch.clamp(pg, -10.0, 10.0)
+
+    err = torch.sum((pg - target)**2, dim=1)
+    return torch.clamp(err, 0.0, 10.0)
 
 
 def legstand_front_feet_air(
@@ -69,6 +76,7 @@ def legstand_base_contact_penalty(
     contact = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, 2]
     return -torch.clamp(contact, min=0.0, max=100.0).sum(dim=1) / 100.0
 
+
 """
 def legstand_joint_limit_penalty(
     env: ManagerBasedRLEnv,
@@ -84,8 +92,8 @@ def legstand_joint_limit_penalty(
 
 
 def legstand_drift_penalty(
-    env: ManagerBasedRLEnv,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+        env: ManagerBasedRLEnv,
+        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Penalize drifting away from the starting XY position (helps balance stability)."""
     asset: RigidObject = env.scene[asset_cfg.name]
@@ -95,9 +103,9 @@ def legstand_drift_penalty(
 
 
 def legstand_bonus_upright(
-    env: ManagerBasedRLEnv,
-    orientation_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces"),
+        env: ManagerBasedRLEnv,
+        orientation_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+        sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces"),
 ) -> torch.Tensor:
     """Bonus reward if robot is upright AND front feet are in the air."""
     asset: RigidObject = env.scene[orientation_cfg.name]

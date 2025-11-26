@@ -19,10 +19,13 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
     front_feet_height = RewTerm(
         func=legstand_feet_height_exp,
         weight=0.0,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=["FL_foot", "FR_foot"]),
-                 "target_height": 0.5, "std": math.sqrt(0.25)},
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=["FL_foot", "FR_foot"]),
+            "target_height": 0.5,
+            "std": math.sqrt(0.25)
+        },
     )
-    
+
     orientation = RewTerm(
         func=legstand_orientation_l2,
         weight=0.0,
@@ -47,11 +50,12 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base"])},
     )
 
+
 @configclass
 class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
 
     # add custom rewards
-    rewards: UnitreeGo2LegStandRewardsCfg = UnitreeGo2LegStandRewardsCfg() 
+    rewards: UnitreeGo2LegStandRewardsCfg = UnitreeGo2LegStandRewardsCfg()
 
     def __post_init__(self):
         # post init of parent
@@ -65,7 +69,6 @@ class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
         self.rewards.track_ang_vel_z_exp.weight = 0.0
         self.rewards.lin_vel_z_l2.weight = 0.0
         self.rewards.ang_vel_xy_l2.weight = 0.0
-
 
         # Add handstand-specific reward
         self.rewards.front_feet_height.weight = 1.5
@@ -89,12 +92,8 @@ class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
         self.curriculum.terrain_levels = None
 
 
-
-
-        
-
-
 class UnitreeGo2LegStandEnvCfg_PLAY(UnitreeGo2LegStandEnvCfg):
+
     def __post_init__(self) -> None:
         # post init of parent
         super().__post_init__()

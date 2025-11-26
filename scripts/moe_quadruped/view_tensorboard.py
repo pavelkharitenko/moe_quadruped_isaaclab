@@ -119,7 +119,7 @@ def analyze_tfevents(event_file: str, ignore_last_k: int = 0):
     fig.suptitle("Training Analysis", fontsize=11)
     plt.tight_layout()
     plt.show()
-    plt.savefig('run_41_ppo_with_onehot_vec.png')
+    plt.savefig('run_42_moe_fl_with_onehot_vec.png')
 
     # ---------------------
     # Plot Mean Episode Length
@@ -144,7 +144,7 @@ def analyze_tfevents(event_file: str, ignore_last_k: int = 0):
 
 
 if __name__ == "__main__":
-    event_file = r"logs/rsl_rl/unitree_go2_flat/2025-11-25_06-09-22_run41_mt_ppo_fl_oh/events.out.tfevents.1764050993.lrz-server1.3600078.0"
+    event_file = r"logs/rsl_rl/unitree_go2_flat/2025-11-25_09-43-10_run43_mt_moe_fl_oh/events.out.tfevents.1764063822.lrz-server1.3617652.0"
 
     # ignore last 200 iterations
-    analyze_tfevents(event_file, ignore_last_k=0)
+    analyze_tfevents(event_file, ignore_last_k=3)
