@@ -55,7 +55,6 @@ gym.register(
     },
 )
 
-
 # legstand
 gym.register(
     id="Isaac-Velocity-LegStand-Unitree-Go2-MoE-v0",
@@ -79,7 +78,31 @@ gym.register(
     },
 )
 
+# legstand reworked
+gym.register(
+    id="Isaac-Velocity-LegStand-Reworked-Unitree-Go2-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.legstand_reworked_env_cfg:UnitreeGo2LegStandReworkedEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
+gym.register(
+    id="Isaac-Velocity-LegStand-Reworked-Unitree-Go2-Play-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.legstand_reworked_env_cfg:UnitreeGo2LegStandReworkedEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
 # bipedal walking
+
 gym.register(
     id="Isaac-Bipedal-Unitree-Go2-MoE-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
@@ -101,10 +124,6 @@ gym.register(
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
     },
 )
-
-
-
-
 
 gym.register(
     id="Isaac-Tracking-Goal-Unitree-Go2-MoE-v0",
@@ -128,7 +147,6 @@ gym.register(
     },
 )
 
-
 gym.register(
     id="Isaac-Tracking-Hierarchial-Unitree-Go2-MoE-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
@@ -150,4 +168,3 @@ gym.register(
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
     },
 )
-
