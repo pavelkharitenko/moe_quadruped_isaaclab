@@ -65,6 +65,44 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         },
     )
 
+    legstand_base_height_exp = RewTerm(
+        func=legstand_base_height_exp,
+        weight=0.0,   # recommended starting weight
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "target_height": 1.0,
+            "sigma": 0.10,
+        },
+    )
+    legstand_rear_leg_straight = RewTerm(
+        func=legstand_rear_leg_straight_exp,
+        weight=0.0,   # recommended starting weight
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "target_angles": {
+                "RL_hip_joint": 0.0,
+                "RR_hip_joint": 0.0,
+                "RL_thigh_joint": 1.2,
+                "RR_thigh_joint": 1.2,
+                "RL_calf_joint": -2.2,
+                "RR_calf_joint": -2.2,
+            },
+            "sigma": 0.30,
+        },
+    )
+
+    legstand_rear_leg_symmetry = RewTerm(
+        func=legstand_rear_leg_symmetry_exp,
+        weight=0.0,   # recommended starting weight
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sigma": 0.20,
+        },
+    )
+
+
+
+
 
 @configclass
 class UnitreeGo2LegStandReworkedEnvCfg(UnitreeGo2FlatEnvCfg):
@@ -85,13 +123,17 @@ class UnitreeGo2LegStandReworkedEnvCfg(UnitreeGo2FlatEnvCfg):
         self.rewards.ang_vel_xy_l2.weight = 0.0
 
         # ----------- legstand rewards -----------
+        
         self.rewards.legstand_feet_height_exp.weight = 2.0  # exp reward, main shaping
-        self.rewards.legstand_orientation_exp.weight = -3.0  # small pose stabilization
-        self.rewards.legstand_front_feet_air.weight = 4.0  # binary air-of-front-feet
+        self.rewards.legstand_orientation_exp.weight = 3.0  # small pose stabilization
+        self.rewards.legstand_front_feet_air.weight = 1.0  # binary air-of-front-feet
         self.rewards.legstand_back_feet_support.weight = 1.0  # small shaping term
-        self.rewards.legstand_base_contact_penalty.weight = -5.0  # strong penalty
+        self.rewards.legstand_base_contact_penalty.weight = -2.0  # strong penalty
         self.rewards.legstand_drift_penalty.weight = -0.5  # tiny penalty
-        self.rewards.legstand_bonus_upright.weight = 5.0  # sparse bonus
+        self.rewards.legstand_bonus_upright.weight = 1.0  # sparse bonus
+        self.rewards.legstand_base_height_exp.weight = 2.0
+        self.rewards.legstand_rear_leg_straight.weight = 2.0
+        self.rewards.legstand_rear_leg_symmetry.weight = 1.0
         # ----------------------------------------
 
         # terrain settings

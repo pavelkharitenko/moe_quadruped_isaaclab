@@ -312,7 +312,7 @@ class MyOnPolicyRunner(OnPolicyRunner):
                         self.current_learning_iteration,
                     )
 
-    def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
+    def learn1(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
         """Extended learn() with full diagnostics for PPO buffer and reward statistics."""
 
         # === Initialize logger ===

@@ -149,3 +149,87 @@ def legstand_bonus_upright(
     bonus = upright * front_air_score
 
     return 0.5 * bonus  # scale small so it doesn't dominate
+
+def legstand_base_height_exp(
+    env: ManagerBasedRLEnv,
+    target_height: float = 1.0,
+    sigma: float = 0.1,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """
+    Reward base height near the target.
+    Gaussian shape: exp(-(z - target)^2 / sigma^2)
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    z = asset.data.root_pos_w[:, 2]  # base height
+
+    height_err = (z - target_height) ** 2
+    return torch.exp(-height_err / (sigma ** 2))
+
+
+def legstand_rear_leg_straight_exp(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    target_angles: dict[str, float] = {
+        "RL_hip_joint": 0.1,
+        "RR_hip_joint": 0.1,
+        "FL_thigh_joint": -0.8,
+        "FR_thigh_joint": -0.8,
+        "RL_thigh_joint": 1.8,
+        "RR_thigh_joint": 1.8,
+        "RL_calf_joint": -1.2,
+        "RR_calf_joint": -1.2,
+    },
+    sigma: float = 0.2,
+) -> torch.Tensor:
+    """
+    Reward rear legs being close to straight target angles.
+    Computes MSE over rear joints and applies exp(-error/sigma^2).
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    joint_names = asset.data.joint_names
+    q = asset.data.joint_pos
+
+    # Build target vector aligned to joint order
+    target_q = torch.tensor(
+        [target_angles.get(n, 0.0) for n in joint_names],
+        device=env.device,
+        dtype=torch.float,
+    )
+
+    # mask only rear joints
+    rear_ids = [i for i, n in enumerate(joint_names)
+                if n.startswith("RL_") or n.startswith("RR_")]
+
+    diff = q[:, rear_ids] - target_q[rear_ids]
+    mse = torch.mean(diff ** 2, dim=1)
+
+    return torch.exp(-mse / (sigma ** 2))
+
+
+def legstand_rear_leg_symmetry_exp(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    sigma: float = 0.2,
+) -> torch.Tensor:
+    """
+    Encourage symmetry between RL and RR joints.
+    Computes mean squared difference and converts via exp(-err/sigma^2).
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    joint_names = asset.data.joint_names
+    q = asset.data.joint_pos
+
+    # RL_* joints
+    rl_ids = [i for i, n in enumerate(joint_names) if n.startswith("RL_")]
+    rr_ids = [i for i, n in enumerate(joint_names) if n.startswith("RR_")]
+
+    # Make sure they match in structure (Go2 does)
+    rl = q[:, rl_ids]
+    rr = q[:, rr_ids]
+
+    # symmetry error (L vs R)
+    diff = rl - rr
+    mse = torch.mean(diff ** 2, dim=1)
+
+    return torch.exp(-mse / (sigma ** 2))
