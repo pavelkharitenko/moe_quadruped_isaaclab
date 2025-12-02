@@ -152,8 +152,8 @@ def legstand_bonus_upright(
 
 def legstand_base_height_exp(
     env: ManagerBasedRLEnv,
-    target_height: float = 1.0,
-    sigma: float = 0.1,
+    target_height: float,
+    sigma: float,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """
@@ -173,14 +173,14 @@ def legstand_rear_leg_straight_exp(
     target_angles: dict[str, float] = {
         "RL_hip_joint": 0.1,
         "RR_hip_joint": 0.1,
-        "FL_thigh_joint": -0.8,
-        "FR_thigh_joint": -0.8,
+        #"FL_thigh_joint": -0.8,
+        #"FR_thigh_joint": -0.8,
         "RL_thigh_joint": 1.8,
         "RR_thigh_joint": 1.8,
         "RL_calf_joint": -1.2,
         "RR_calf_joint": -1.2,
     },
-    sigma: float = 0.2,
+    sigma: float = 0.3,
 ) -> torch.Tensor:
     """
     Reward rear legs being close to straight target angles.
@@ -207,29 +207,37 @@ def legstand_rear_leg_straight_exp(
     return torch.exp(-mse / (sigma ** 2))
 
 
-def legstand_rear_leg_symmetry_exp(
+
+
+def legstand_leg_symmetry_exp(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     sigma: float = 0.2,
 ) -> torch.Tensor:
     """
-    Encourage symmetry between RL and RR joints.
+    Encourage symmetry between left and right joints (front and rear legs).
     Computes mean squared difference and converts via exp(-err/sigma^2).
     """
     asset: RigidObject = env.scene[asset_cfg.name]
     joint_names = asset.data.joint_names
     q = asset.data.joint_pos
 
-    # RL_* joints
+    # --- Rear legs ---
     rl_ids = [i for i, n in enumerate(joint_names) if n.startswith("RL_")]
     rr_ids = [i for i, n in enumerate(joint_names) if n.startswith("RR_")]
-
-    # Make sure they match in structure (Go2 does)
     rl = q[:, rl_ids]
     rr = q[:, rr_ids]
+    rear_diff = rl - rr
 
-    # symmetry error (L vs R)
-    diff = rl - rr
+    # --- Front legs ---
+    fl_ids = [i for i, n in enumerate(joint_names) if n.startswith("FL_")]
+    fr_ids = [i for i, n in enumerate(joint_names) if n.startswith("FR_")]
+    fl = q[:, fl_ids]
+    fr = q[:, fr_ids]
+    front_diff = fl - fr
+
+    # combine errors
+    diff = torch.cat([rear_diff, front_diff], dim=1)
     mse = torch.mean(diff ** 2, dim=1)
 
     return torch.exp(-mse / (sigma ** 2))

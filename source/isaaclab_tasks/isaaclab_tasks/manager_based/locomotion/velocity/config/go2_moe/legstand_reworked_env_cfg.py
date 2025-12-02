@@ -70,8 +70,8 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         weight=0.0,   # recommended starting weight
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_height": 1.0,
-            "sigma": 0.10,
+            "target_height": 0.6,
+            "sigma": math.sqrt(0.25),
         },
     )
     legstand_rear_leg_straight = RewTerm(
@@ -79,20 +79,12 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         weight=0.0,   # recommended starting weight
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            "target_angles": {
-                "RL_hip_joint": 0.0,
-                "RR_hip_joint": 0.0,
-                "RL_thigh_joint": 1.2,
-                "RR_thigh_joint": 1.2,
-                "RL_calf_joint": -2.2,
-                "RR_calf_joint": -2.2,
-            },
             "sigma": 0.30,
         },
     )
 
-    legstand_rear_leg_symmetry = RewTerm(
-        func=legstand_rear_leg_symmetry_exp,
+    legstand_leg_symmetry_exp = RewTerm(
+        func=legstand_leg_symmetry_exp,
         weight=0.0,   # recommended starting weight
         params={
             "asset_cfg": SceneEntityCfg("robot"),
@@ -124,16 +116,16 @@ class UnitreeGo2LegStandReworkedEnvCfg(UnitreeGo2FlatEnvCfg):
 
         # ----------- legstand rewards -----------
         
-        self.rewards.legstand_feet_height_exp.weight = 2.0  # exp reward, main shaping
-        self.rewards.legstand_orientation_exp.weight = 3.0  # small pose stabilization
-        self.rewards.legstand_front_feet_air.weight = 1.0  # binary air-of-front-feet
+        self.rewards.legstand_feet_height_exp.weight = 10.0  # exp reward, main shaping
+        self.rewards.legstand_orientation_exp.weight = 20.0  # small pose stabilization
+        #self.rewards.legstand_front_feet_air.weight = 0.5  # binary air-of-front-feet
         self.rewards.legstand_back_feet_support.weight = 1.0  # small shaping term
-        self.rewards.legstand_base_contact_penalty.weight = -2.0  # strong penalty
-        self.rewards.legstand_drift_penalty.weight = -0.5  # tiny penalty
-        self.rewards.legstand_bonus_upright.weight = 1.0  # sparse bonus
-        self.rewards.legstand_base_height_exp.weight = 2.0
+        self.rewards.legstand_base_contact_penalty.weight = -1.0  # strong penalty
+        #self.rewards.legstand_drift_penalty.weight = -0.5  # tiny penalty
+        #self.rewards.legstand_bonus_upright.weight = 3.0  # sparse bonus
+        self.rewards.legstand_base_height_exp.weight = 10.0
         self.rewards.legstand_rear_leg_straight.weight = 2.0
-        self.rewards.legstand_rear_leg_symmetry.weight = 1.0
+        self.rewards.legstand_leg_symmetry_exp.weight = 0.5
         # ----------------------------------------
 
         # terrain settings
@@ -146,6 +138,9 @@ class UnitreeGo2LegStandReworkedEnvCfg(UnitreeGo2FlatEnvCfg):
 
         # no terrain curriculum
         self.curriculum.terrain_levels = None
+
+        self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
+        self.terminations.base_contact.time_out = True
 
 
 class UnitreeGo2LegStandReworkedEnvCfg_PLAY(UnitreeGo2LegStandReworkedEnvCfg):
