@@ -118,13 +118,13 @@ def analyze_tfevents(event_file: str, ignore_last_k: int = 0):
 
     fig.suptitle("Training Analysis", fontsize=11)
     plt.tight_layout()
-    plt.show()
+    #plt.show()
     plt.savefig('run45_st_ppo_handstand_back_v4.png')
 
     # ---------------------
     # Plot Mean Episode Length
     # ---------------------
-    if "Train/mean_episode_length" in available:
+    if "Train/mean_episode_length" in available and False:
         events = ea.Scalars("Train/mean_episode_length")
         steps = np.array([e.step for e in events])
         values = np.array([e.value for e in events])
