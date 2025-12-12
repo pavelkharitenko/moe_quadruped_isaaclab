@@ -19,7 +19,7 @@ class UnitreeGo2HandStandRewardsCfg(RewardsCfg):
     handstand_feet_height_exp = RewTerm(
         func=handstand_feet_height_exp,
         weight=0.0,
-        params={"asset_cfg": SceneEntityCfg("robot"), "target_height": 0.5, "std": math.sqrt(0.25)},
+        params={"asset_cfg": SceneEntityCfg("robot"), "target_height": 0.6, "std": math.sqrt(0.25)},
     )
 
     handstand_feet_on_air = RewTerm(
@@ -81,8 +81,8 @@ class UnitreeGo2HandStandEnvCfg(UnitreeGo2FlatEnvCfg):
 
 
         # Velocity-tracking rewards
-        self.rewards.track_lin_vel_xy_exp.weight = 3.0
-        self.rewards.track_ang_vel_z_exp.weight = 1.5
+        self.rewards.track_lin_vel_xy_exp.weight = 0.0
+        self.rewards.track_ang_vel_z_exp.weight = 0.0
 
 
         # Others
@@ -114,11 +114,11 @@ class UnitreeGo2HandStandEnvCfg(UnitreeGo2FlatEnvCfg):
             self.rewards.handstand_orientation_l2.params["target_gravity"] = [0.0, 1.0, 0.0]
             self.rewards.handstand_feet_height_exp.params["target_height"] = 0.3
         
-        self.rewards.handstand_feet_height_exp.weight = 10.0
+        self.rewards.handstand_feet_height_exp.weight = 2.5
         self.rewards.handstand_feet_height_exp.params["asset_cfg"].body_names = [air_foot_name]
-        self.rewards.handstand_feet_on_air.weight = 5.0
+        self.rewards.handstand_feet_on_air.weight = 1.0
         self.rewards.handstand_feet_on_air.params["sensor_cfg"].body_names = [air_foot_name]
-        self.rewards.handstand_feet_air_time.weight = 5.0
+        self.rewards.handstand_feet_air_time.weight = 1.0
         self.rewards.handstand_feet_air_time.params["sensor_cfg"].body_names = [air_foot_name]
 
         # change terrain to flat
