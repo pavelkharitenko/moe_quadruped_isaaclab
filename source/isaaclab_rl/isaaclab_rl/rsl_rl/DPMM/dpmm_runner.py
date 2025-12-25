@@ -24,25 +24,22 @@ from rsl_rl.modules import (
     StudentTeacherRecurrent,
 )
 
-from dpmm_utils import (
+from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (
     DPMMReplayBuffer, 
+    Transition,
     LatentInjectedEnvWrapper, 
     class_to_dict, 
     TrajectoryCollector
 )
 
-from dpmm_config import DpmmVaeCfg
+from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfg
 
-from MELTS.tigr.task_inference.prediction_networks import DecoderMDP
-from MELTS.tigr.task_inference.dpmm_bnp import BNPModel
-from MELTS.tigr.task_inference.dpmm_inference import DecoupledEncoder
-from MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
+#from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.prediction_networks import DecoderMDP
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_bnp import BNPModel
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_inference import DecoupledEncoder
+#from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
 
 
-
-class DpmmVaeOnPolicyRunner(OnPolicyRunner):
-    def __init__(self, env, train_cfg, encoder_cfg, device):
-        super().__init__(env, train_cfg, device=device)
 
 
 
@@ -299,6 +296,8 @@ class DPMMRunner(OnPolicyRunner):
         obs, extras = self.env.get_observations()
         privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
         obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+
+
         self.train_mode()
 
         # === Initialize buffers ===
@@ -308,7 +307,11 @@ class DPMMRunner(OnPolicyRunner):
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         # DPMM-VAE buffer
-        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size)
+        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size, device=self.device)
+
+        # one temporary trajectory per env
+        self._dpmm_trajs = [[] for _ in range(self.env.num_envs)]
+        prev_obs = obs.clone() # save as "s" in first tuple (s,a,r,s')
         
 
         # === CSV setup ===
@@ -320,14 +323,59 @@ class DPMMRunner(OnPolicyRunner):
         tot_iter = start_iter + num_learning_iterations
         for it in range(start_iter, tot_iter):
             start_time = time.time()
+            
+            # select subset of envs for DPMM data collection (and shuffle for randomness):
+            n = self.dpmm_cfg.num_envs_per_iter
+            env_indices = torch.randperm(self.env.num_envs, device=self.device)[:n]
+            print("env indices")
+            print(env_indices)
+            print("Buffer length:", len(self.dpmm_buffer))
 
             # === Collect rollouts ===
             with torch.inference_mode():
                 for _ in range(self.num_steps_per_env):
+                    # sample actions
                     actions = self.alg.act(obs, privileged_obs)
+
+                    # step environment & move to device
                     obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
                     obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
+                    # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
+                    next_obs = obs.clone()
+
+                    for i in env_indices:
+                        self._dpmm_trajs[i].append(
+                            Transition(
+                                obs=prev_obs[i],
+                                action=actions[i],
+                                reward=rewards[i],
+                                next_obs=next_obs[i],
+                                done=dones[i],
+                                task_id=None,  # or infos[i].get("task_id")
+                            )
+                        )
+
+                    prev_obs = next_obs
+
+                    # flush completed/long trajectories into replay buffer
+                    flush_list = []
+
+                    for i in env_indices:
+                        if dones[i] or len(self._dpmm_trajs[i]) >= self.dpmm_cfg.max_traj_len:
+                            flush_list.append(self._dpmm_trajs[i])
+                            self._dpmm_trajs[i] = []
+
+
+                    # shuffle trajectories so short ones are not always appended first into DPMM-Buffer
+                    if len(flush_list) > 0:
+                        perm = torch.randperm(len(flush_list))
+                        for p in perm:
+                            traj = flush_list[p]
+                            for transition in traj:
+                                self.dpmm_buffer.buffer.append(transition)
+                    
+                    
 
                     obs = self.obs_normalizer(obs)
                     privileged_obs = (self.privileged_obs_normalizer(
@@ -352,6 +400,29 @@ class DPMMRunner(OnPolicyRunner):
                 # Compute returns
                 if self.training_type == "rl":
                     self.alg.compute_returns(privileged_obs)
+
+
+
+
+            # DPMM-VAE training update: 
+
+            # sample batch from DPMM-Buffer according strategy Sc and pass sequentially to GRU:
+            batch_dpmm = self.dpmm_buffer.sample_contexts(
+                batch_size=self.dpmm_cfg.batch_size, 
+                nw=self.dpmm_cfg.context_length)
+
+            if len(self.dpmm_buffer.buffer) > 0:
+                print("LAST APPENDED TRAJ SHAPE")
+                print(len(self.dpmm_buffer.buffer[-1]))
+
+            if not batch_dpmm:
+                print("BATCH DPMM has only TRAJS LESS THAN Nw")
+            else:
+                print("BATCH SHAPE")
+                print(len(batch_dpmm[-1]))                
+                #print(torch.asarray(batch_dpmm).shape)
+
+
 
             # === PPO update ===
             start_update = time.time()

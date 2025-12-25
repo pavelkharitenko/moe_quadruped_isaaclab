@@ -5,7 +5,19 @@ Contains helper functions and classes for universal_policy
 import numpy as np
 import torch
 from collections import deque
-from legged_gym.scripts.universal_policy_config import UniversalpolicyCfg
+#from legged_gym.scripts.universal_policy_config import UniversalpolicyCfg
+
+from dataclasses import dataclass
+
+@dataclass
+class Transition:
+    obs: torch.Tensor
+    action: torch.Tensor
+    reward: torch.Tensor
+    next_obs: torch.Tensor
+    done: torch.Tensor
+    task_id: int | None
+
 
 
 class DPMMReplayBuffer:
@@ -16,16 +28,99 @@ class DPMMReplayBuffer:
     dictionary contains observation, action, reward, next observation, and task info.
     """
 
-    def __init__(self, size):
+    def __init__(self, size: int, device="cpu"):
+        self.size = size
+        self.device = device
         self.buffer = deque(maxlen=size)
+
     
-    def add(self, transition):
-        self.buffer.append(transition)
+    @torch.no_grad()
+    def add(
+        self,
+        obs,
+        action,
+        reward,
+        next_obs,
+        done,
+        task_id=None,
+        task_name=None,
+    ):
+        self.buffer.append(
+            Transition(
+                obs=obs.detach().to(self.device),
+                action=action.detach().to(self.device),
+                reward=reward.detach().to(self.device),
+                next_obs=next_obs.detach().to(self.device),
+                done=done.detach().to(self.device),
+                task_id=task_id,
+            )
+        )
+
+    @torch.no_grad()
+    def add_batch(
+        self,
+        obs,
+        actions,
+        rewards,
+        next_obs,
+        dones,
+        infos=None,
+    ):
+        num_envs = obs.shape[0]
+
+        for i in range(num_envs):
+            task_id = None
+            if infos is not None:
+                info_i = infos[i]
+                task_id = info_i.get("task_id", None)
+
+            self.add(
+                obs=obs[i],
+                action=actions[i],
+                reward=rewards[i],
+                next_obs=next_obs[i],
+                done=dones[i],
+                task_id=task_id,
+            )
+
 
     def __len__(self):
         return len(self.buffer)
     
-    def sample_contexts(self, batch_size, nw, priority=True):
+
+    def sample_indices_priority(self, batch_size):
+        T = len(self.buffer)
+        weights = torch.arange(1, T + 1, dtype=torch.float)
+        probs = weights / weights.sum()
+        indices = torch.multinomial(probs, batch_size, replacement=True)
+
+        print("batch_size", batch_size)
+        print("indices", indices)
+
+        return indices.tolist()
+
+
+    def sample_contexts(self, batch_size, nw):
+        """
+        Sample (batch_size)-amount of contexts C_t according to paper's sampling strategy Sc,
+        where C_t = (c_t-nw, ... , c_t-1, c_t) and each c_t = (s, a, r, s')t.
+        """
+        if not (len(self.buffer) >= nw):
+            return None
+
+        indices = self.sample_indices_priority(batch_size)
+        contexts = []
+
+        for t in indices:
+            start = max(0, t - nw + 1)
+            window = list(self.buffer)[start : t + 1]
+
+            contexts.append(window)
+
+        return contexts
+
+
+    def sample_contexts_priority(self, batch_size, nw, priority=True):
         """
         Sample (batch_size)-amount of contexts C_t according to paper's sampling strategy Sc,
         where C_t = (c_t-nw, ... , c_t-1, c_t) and each c_t = (s, a, r, s')t.
