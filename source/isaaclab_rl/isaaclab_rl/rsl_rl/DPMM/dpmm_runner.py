@@ -35,7 +35,9 @@ from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (
 from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfg
 
 #from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.prediction_networks import DecoderMDP
-from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_bnp import BNPModel
+#from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_bnp import BNPModel
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_pyro import PyroBNPModel
+
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_inference import DecoupledEncoder
 #from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
 
@@ -327,9 +329,7 @@ class DPMMRunner(OnPolicyRunner):
             # select subset of envs for DPMM data collection (and shuffle for randomness):
             n = self.dpmm_cfg.num_envs_per_iter
             env_indices = torch.randperm(self.env.num_envs, device=self.device)[:n]
-            print("env indices")
-            print(env_indices)
-            print("Buffer length:", len(self.dpmm_buffer))
+            print("selected env indices", env_indices)
 
             # === Collect rollouts ===
             with torch.inference_mode():
@@ -340,6 +340,10 @@ class DPMMRunner(OnPolicyRunner):
                     # step environment & move to device
                     obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
                     obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
+
+
+                    
+                    
 
                     # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
                     next_obs = obs.clone()
@@ -402,6 +406,21 @@ class DPMMRunner(OnPolicyRunner):
                     self.alg.compute_returns(privileged_obs)
 
 
+            # log DPMM-buffer statistics
+            if it % self.dpmm_cfg.log_interval == 0 and len(self.dpmm_buffer) > 0:
+                print(
+                    f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)} | "
+                    f"last_reward={self.dpmm_buffer.buffer[-1].reward:.3f} | "
+                    f"done={self.dpmm_buffer.buffer[-1].done}"
+                )
+
+                done_count = sum(t.done for t in self.dpmm_buffer.buffer)
+                print(
+                    f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer):.4f}"
+                )
+                print(
+                    f"DPMM done count = {done_count:.4f}"
+                )
 
 
             # DPMM-VAE training update: 
@@ -410,18 +429,6 @@ class DPMMRunner(OnPolicyRunner):
             batch_dpmm = self.dpmm_buffer.sample_contexts(
                 batch_size=self.dpmm_cfg.batch_size, 
                 nw=self.dpmm_cfg.context_length)
-
-            if len(self.dpmm_buffer.buffer) > 0:
-                print("LAST APPENDED TRAJ SHAPE")
-                print(len(self.dpmm_buffer.buffer[-1]))
-
-            if not batch_dpmm:
-                print("BATCH DPMM has only TRAJS LESS THAN Nw")
-            else:
-                print("BATCH SHAPE")
-                print(len(batch_dpmm[-1]))                
-                #print(torch.asarray(batch_dpmm).shape)
-
 
 
             # === PPO update ===
