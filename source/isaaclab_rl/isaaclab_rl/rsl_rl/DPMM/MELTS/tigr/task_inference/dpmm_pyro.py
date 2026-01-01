@@ -151,17 +151,30 @@ class PyroBNPModel:
 
         return resp.detach().cpu(), Z.detach().cpu()
 
-    def fit(self, z, num_steps=200):
-        """
-        Equivalent to bnpy.run(...)
-        """
+    def fit(
+        self,
+        z,
+        num_laps=20,
+        svi_steps_per_lap=10,
+    ):
         z = z.detach().to(self.device)
 
-        pyro.clear_param_store()
-        for _ in range(num_steps):
-            self.svi.step(z)
+        for lap in range(num_laps):
+            # Variational updates
+            for _ in range(svi_steps_per_lap):
+                self.svi.step(z)
 
-        self._update_component_params()
+            self._update_component_params()
+            self.Z_buffer.append(z.detach().cpu())
+
+            # Birth
+            if lap >= 1:
+                self.birth_move_elbo(z)
+
+            # Merge
+            if lap >= 2:
+                self.merge_move_elbo(z)
+
 
 
     def _update_component_params(self):
@@ -169,65 +182,8 @@ class PyroBNPModel:
         self.comp_var = pyro.param("sigma_q").pow(2).detach().cpu()
 
 
-    def birth_move(self, min_weight=50, var_thresh=1.0):
-        """
-        Heuristic birth (split high-variance clusters)
-        """
-        Nk = self._component_usage()
-
-        new_mu, new_var = [], []
-
-        for k in range(self.K):
-            mu, var = self.comp_mu[k], self.comp_var[k]
-
-            if Nk[k] > min_weight and var.mean() > var_thresh:
-                eps = 0.1 * torch.randn_like(mu)
-                new_mu += [mu + eps, mu - eps]
-                new_var += [var.clone(), var.clone()]
-            else:
-                new_mu.append(mu)
-                new_var.append(var)
-
-        self._reset_components(new_mu, new_var)
-
-
-    def merge_move(self, kl_thresh=0.1, min_weight=10):
-        Nk = self._component_usage()
-
-        merged = set()
-        new_mu, new_var = [], []
-
-        for i in range(self.K):
-            if i in merged or Nk[i] < min_weight:
-                continue
-
-            for j in range(i + 1, self.K):
-                if j in merged or Nk[j] < min_weight:
-                    continue
-
-                kl = kl_diag_gaussian(
-                    self.comp_mu[i], self.comp_var[i],
-                    self.comp_mu[j], self.comp_var[j],
-                )
-
-                if kl < kl_thresh:
-                    wi, wj = Nk[i], Nk[j]
-                    mu = (wi * self.comp_mu[i] + wj * self.comp_mu[j]) / (wi + wj)
-                    var = (wi * self.comp_var[i] + wj * self.comp_var[j]) / (wi + wj)
-
-                    new_mu.append(mu)
-                    new_var.append(var)
-                    merged.update([i, j])
-                    break
-
-            if i not in merged:
-                new_mu.append(self.comp_mu[i])
-                new_var.append(self.comp_var[i])
-
-        self._reset_components(new_mu, new_var)
-
-
-    def _reset_components(self, new_mu, new_var):
+   
+    def __reset_components(self, new_mu, new_var):
         self.K = len(new_mu)
         self.dpmm.K = self.K
 
@@ -241,8 +197,45 @@ class PyroBNPModel:
             constraint=dist.constraints.positive,
         )
 
+    def _reset_components(self, new_mu, new_var):
+        # ensure list of tensors
+        if isinstance(new_mu, torch.Tensor):
+            new_mu = [new_mu]
+        if isinstance(new_var, torch.Tensor):
+            new_var = [new_var]
+
+        # Flatten each tensor to 1D so stacking works correctly
+        new_mu = [mu.view(-1) if mu.dim() > 1 else mu for mu in new_mu]
+        new_var = [var.view(-1) if var.dim() > 1 else var for var in new_var]
+
+        self.K = len(new_mu)
+        self.dpmm.K = self.K
+
+        pyro.clear_param_store()
+
+        pyro.param("mu_q", torch.stack(new_mu).to(self.device))
+        pyro.param("sigma_q", torch.sqrt(torch.stack(new_var)).to(self.device))
+        pyro.param(
+            "beta_q",
+            torch.ones(self.K, 2, device=self.device),
+            constraint=dist.constraints.positive,
+        )
 
     def _component_usage(self):
+        if len(self.Z_buffer) == 0:
+            return torch.zeros(self.K)
+        
+        Z = torch.cat(self.Z_buffer, dim=0).to(self.device)
+        resp, _ = self.cluster_assignments(Z)  # resp.shape = [N, current K]
+        
+        # ensure we always return length self.K
+        usage = torch.zeros(self.K, device=self.device)
+        K_curr = resp.shape[1]
+        usage[:K_curr] = resp.sum(dim=0)
+        return usage
+
+
+    def __component_usage(self):
         Z = torch.cat(self.Z_buffer, dim=0)
         resp, _ = self.cluster_assignments(Z)
         return resp.sum(dim=0)
@@ -257,3 +250,120 @@ class PyroBNPModel:
             [self.sample_component(num_per, k) for k in range(self.K)],
             dim=0,
         )
+
+
+    def estimate_elbo(self, z, num_particles=5):
+        elbo = 0.0
+        for _ in range(num_particles):
+            elbo += self.svi.loss(self.dpmm.model, self.dpmm.guide, z)
+        return -elbo / num_particles  # higher is better
+    
+
+    def poorly_explained_points(self, z, frac=0.2):
+        resp, _ = self.cluster_assignments(z)
+        max_resp = resp.max(dim=1).values
+        thresh = torch.quantile(max_resp, frac)
+        return z[max_resp < thresh]
+
+    def birth_move_elbo(
+        self,
+        z,
+        frac_poor=0.2,
+        min_points=0,
+        elbo_tol=1e-3,
+    ):
+        """
+        ELBO-based birth move (memoVB-style)
+        """
+        z = z.to(self.device)
+
+        # Step 1: find poorly explained points
+        z_bad = self.poorly_explained_points(z, frac=frac_poor)
+        if z_bad.shape[0] < min_points:
+            return False
+
+        # Step 2: baseline ELBO
+        elbo_before = self.estimate_elbo(z)
+
+        # Step 3: propose split via simple 2-means
+        mu_old = self.comp_mu.clone()
+        var_old = self.comp_var.clone()
+
+        k = torch.argmax(self._component_usage())
+        mu = mu_old[k]
+        eps = 0.1 * torch.randn_like(mu)
+
+        new_mu = list(mu_old)
+        new_var = list(var_old)
+
+        new_mu[k] = mu + eps
+        new_mu.append(mu - eps)
+        new_var.append(var_old[k].clone())
+
+        # Step 4: reset model with proposed structure
+        self._reset_components(new_mu, new_var)
+
+        # Re-optimize briefly
+        for _ in range(20):
+            self.svi.step(z)
+
+        self._update_component_params()
+
+        # Step 5: ELBO comparison
+        elbo_after = self.estimate_elbo(z)
+
+        if elbo_after > elbo_before + elbo_tol:
+            print(f"[BIRTH ACCEPTED] ELBO {elbo_before:.2f} → {elbo_after:.2f}")
+            return True
+        else:
+            # revert
+            self._reset_components(mu_old, var_old)
+            print(f"[BIRTH REJECTED]")
+            return False
+
+    def merge_move_elbo(
+        self,
+        z,
+        kl_thresh=0.5,
+        elbo_tol=1e-3,
+    ):
+        z = z.to(self.device)
+        elbo_before = self.estimate_elbo(z)
+
+        for i in range(self.K):
+            for j in range(i + 1, self.K):
+                kl = kl_diag_gaussian(
+                    self.comp_mu[i], self.comp_var[i],
+                    self.comp_mu[j], self.comp_var[j],
+                )
+                if kl > kl_thresh:
+                    continue
+
+                # Propose merge
+                mu_old = self.comp_mu.clone()
+                var_old = self.comp_var.clone()
+
+                wi, wj = self._component_usage()[[i, j]]
+                mu = (wi * mu_old[i] + wj * mu_old[j]) / (wi + wj)
+                var = (wi * var_old[i] + wj * var_old[j]) / (wi + wj)
+
+                new_mu = [mu_old[k] for k in range(self.K) if k not in (i, j)]
+                new_var = [var_old[k] for k in range(self.K) if k not in (i, j)]
+                new_mu.append(mu)
+                new_var.append(var)
+
+                self._reset_components(new_mu, new_var)
+
+                for _ in range(20):
+                    self.svi.step(z)
+
+                self._update_component_params()
+                elbo_after = self.estimate_elbo(z)
+
+                if elbo_after > elbo_before + elbo_tol:
+                    print(f"[MERGE ACCEPTED] {i},{j}")
+                    return True
+                else:
+                    self._reset_components(mu_old, var_old)
+
+        return False

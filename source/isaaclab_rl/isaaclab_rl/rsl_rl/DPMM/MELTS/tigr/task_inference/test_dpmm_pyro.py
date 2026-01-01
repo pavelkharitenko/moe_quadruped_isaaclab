@@ -90,6 +90,7 @@ def test_dpmm_evolution(
     z,
     steps_per_update=200,
     num_updates=5,
+    num_laps=20,
     svi_steps=500,
 ):
     """
@@ -114,7 +115,7 @@ def test_dpmm_evolution(
         )
 
         # fit dpmm
-        dpmm.fit(z_subset, num_steps=svi_steps)
+        dpmm.fit(z_subset, num_laps=num_laps,svi_steps_per_lap=svi_steps)
 
         # cluster assignments
         resp, Z = dpmm.cluster_assignments(z_subset)
@@ -148,6 +149,7 @@ def plot_responsibilities(resp, max_points=200):
     plt.colorbar(label="responsibility")
     plt.xlabel("data index")
     plt.ylabel("cluster")
+    plt.yticks(range(resp.shape[1]))
     plt.title("Responsibilities (soft assignments)")
     plt.show()
 
@@ -164,7 +166,7 @@ if __name__ == "__main__":
     # Generate synthetic latent data
     # -----------------------------
     z, true_labels = make_sample_data(
-        n_per_cluster=200,
+        n_per_cluster=100,
         centers=[(-4, 0), (0, 0), (4, 0)],
         std=0.6,
         device=device,
@@ -188,8 +190,8 @@ if __name__ == "__main__":
 
     dpmm = PyroBNPModel(
         latent_dim=2,
-        gamma0=5.0,
-        K_init=2,      # overestimate on purpose
+        gamma0=5.0,    # concentration parameter of DP
+        K_init=1,      # start with assuming 1 cluster initially
         device=device,
     )
 
@@ -200,8 +202,9 @@ if __name__ == "__main__":
         dpmm,
         z,
         steps_per_update=200,
-        num_updates=5,
-        svi_steps=500,
+        num_updates=1,
+        num_laps=10,
+        svi_steps=50,
     )
 
     # -----------------------------
