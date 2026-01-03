@@ -34,14 +34,23 @@ class PyroDPMM:
 
         with pyro.plate("components", self.K):
             beta = pyro.sample("beta", dist.Beta(1.0, self.gamma0))
-            mu = pyro.sample(
-                "mu",
-                dist.Normal(0, 5).expand([D]).to_event(1)
-            )
+
             sigma = pyro.sample(
                 "sigma",
-                dist.LogNormal(0.0, 1.0).expand([D]).to_event(1)
+                dist.LogNormal(-1.0, 0.3).expand([D]).to_event(1)
             )
+
+            mu0 = torch.zeros(D, device=self.device)
+            lambda0 = 0.001  # weak mean prior, matches paper
+
+            mu = pyro.sample(
+                "mu",
+                dist.Normal(
+                    mu0,
+                    torch.sqrt(sigma / lambda0)
+                ).to_event(1)
+            )
+
 
         # Stick-breaking weights
         stick = beta
@@ -82,11 +91,24 @@ class PyroDPMM:
             torch.ones(K, D, device=self.device),
             constraint=dist.constraints.positive,
         )
+        lambda0 = 0.01
 
         with pyro.plate("components", K):
             pyro.sample("beta", dist.Beta(beta_q[:, 0], beta_q[:, 1]))
-            pyro.sample("mu", dist.Normal(mu_q, 1.0).to_event(1))
-            pyro.sample("sigma", dist.LogNormal(torch.log(sigma_q), 0.1).to_event(1))
+
+            pyro.sample(
+                "sigma",
+                dist.LogNormal(torch.log(sigma_q), 0.1).to_event(1)
+            )
+
+            pyro.sample(
+                "mu",
+                dist.Normal(
+                    mu_q,
+                    torch.sqrt(sigma_q / lambda0)
+                ).to_event(1)
+            )
+
 
 class PyroBNPModel:
     """
@@ -179,37 +201,22 @@ class PyroBNPModel:
 
     def _update_component_params(self):
         self.comp_mu = pyro.param("mu_q").detach().cpu()
-        self.comp_var = pyro.param("sigma_q").pow(2).detach().cpu()
+        self.comp_var = pyro.param("sigma_q").detach().cpu() ** 2
 
 
-   
-    def __reset_components(self, new_mu, new_var):
-        self.K = len(new_mu)
-        self.dpmm.K = self.K
-
-        pyro.clear_param_store()
-
-        pyro.param("mu_q", torch.stack(new_mu).to(self.device))
-        pyro.param("sigma_q", torch.sqrt(torch.stack(new_var)).to(self.device))
-        pyro.param(
-            "beta_q",
-            torch.ones(self.K, 2, device=self.device),
-            constraint=dist.constraints.positive,
-        )
 
     def _reset_components(self, new_mu, new_var):
-        # ensure list of tensors
+        # Convert tensors → list of tensors
         if isinstance(new_mu, torch.Tensor):
-            new_mu = [new_mu]
+            new_mu = list(new_mu)
         if isinstance(new_var, torch.Tensor):
-            new_var = [new_var]
+            new_var = list(new_var)
 
-        # Flatten each tensor to 1D so stacking works correctly
-        new_mu = [mu.view(-1) if mu.dim() > 1 else mu for mu in new_mu]
-        new_var = [var.view(-1) if var.dim() > 1 else var for var in new_var]
+        assert len(new_mu) == len(new_var)
 
-        self.K = len(new_mu)
-        self.dpmm.K = self.K
+        K_new = len(new_mu)
+        self.dpmm.K = K_new
+        self.K = K_new
 
         pyro.clear_param_store()
 
@@ -217,9 +224,14 @@ class PyroBNPModel:
         pyro.param("sigma_q", torch.sqrt(torch.stack(new_var)).to(self.device))
         pyro.param(
             "beta_q",
-            torch.ones(self.K, 2, device=self.device),
+            torch.ones(K_new, 2, device=self.device),
             constraint=dist.constraints.positive,
         )
+
+        self._update_component_params()
+
+
+
 
     def _component_usage(self):
         if len(self.Z_buffer) == 0:
@@ -235,10 +247,7 @@ class PyroBNPModel:
         return usage
 
 
-    def __component_usage(self):
-        Z = torch.cat(self.Z_buffer, dim=0)
-        resp, _ = self.cluster_assignments(Z)
-        return resp.sum(dim=0)
+
 
     def sample_component(self, num_samples, k):
         mu, var = self.comp_mu[k], self.comp_var[k]
@@ -260,17 +269,29 @@ class PyroBNPModel:
     
 
     def poorly_explained_points(self, z, frac=0.2):
-        resp, _ = self.cluster_assignments(z)
-        max_resp = resp.max(dim=1).values
-        thresh = torch.quantile(max_resp, frac)
-        return z[max_resp < thresh]
+        z = z.to(self.device)
+
+        mu = self.comp_mu.to(self.device)
+        var = self.comp_var.to(self.device)
+
+        log_liks = []
+        for k in range(mu.shape[0]):
+            dist_k = torch.distributions.Normal(mu[k], var[k].sqrt())
+            log_liks.append(dist_k.log_prob(z).sum(dim=1))
+
+        log_liks = torch.stack(log_liks, dim=1)   # [N, K]
+        best_ll = log_liks.max(dim=1).values      # best explaining component
+
+        thresh = torch.quantile(best_ll, frac)
+        return z[best_ll < thresh]
+
 
     def birth_move_elbo(
         self,
         z,
         frac_poor=0.2,
-        min_points=0,
-        elbo_tol=1e-3,
+        min_points=10,
+        elbo_tol=-5,
     ):
         """
         ELBO-based birth move (memoVB-style)
@@ -279,6 +300,8 @@ class PyroBNPModel:
 
         # Step 1: find poorly explained points
         z_bad = self.poorly_explained_points(z, frac=frac_poor)
+
+        print("Bad shape", z_bad.shape[0])
         if z_bad.shape[0] < min_points:
             return False
 
@@ -289,16 +312,25 @@ class PyroBNPModel:
         mu_old = self.comp_mu.clone()
         var_old = self.comp_var.clone()
 
-        k = torch.argmax(self._component_usage())
+        resp, Z = self.cluster_assignments(z_bad)
+        counts = torch.bincount(Z, minlength=self.comp_mu.shape[0])
+        k = torch.argmax(counts)
+
         mu = mu_old[k]
         eps = 0.1 * torch.randn_like(mu)
 
         new_mu = list(mu_old)
         new_var = list(var_old)
 
-        new_mu[k] = mu + eps
-        new_mu.append(mu - eps)
-        new_var.append(var_old[k].clone())
+        var_new = z_bad.var(dim=0) + 1e-3
+        lambda0 = 0.01
+        mu0 = torch.zeros_like(var_new)
+
+        mu_new = mu0 + torch.randn_like(var_new) * torch.sqrt(var_new / lambda0)
+
+
+        new_mu.append(mu_new)
+        new_var.append(var_new)
 
         # Step 4: reset model with proposed structure
         self._reset_components(new_mu, new_var)
@@ -311,6 +343,10 @@ class PyroBNPModel:
 
         # Step 5: ELBO comparison
         elbo_after = self.estimate_elbo(z)
+        
+        print("Elbo before", elbo_before)
+        print("Elbo tol", elbo_tol)
+        print("Elbo after", elbo_before)
 
         if elbo_after > elbo_before + elbo_tol:
             print(f"[BIRTH ACCEPTED] ELBO {elbo_before:.2f} → {elbo_after:.2f}")
@@ -324,14 +360,19 @@ class PyroBNPModel:
     def merge_move_elbo(
         self,
         z,
-        kl_thresh=0.5,
-        elbo_tol=1e-3,
+        kl_thresh=0.1,
+        elbo_tol=-5,
     ):
+        K = self.comp_mu.shape[0]
+        if K < 2:
+            return False
+        
         z = z.to(self.device)
         elbo_before = self.estimate_elbo(z)
 
-        for i in range(self.K):
-            for j in range(i + 1, self.K):
+
+        for i in range(K):
+            for j in range(i + 1, K):
                 kl = kl_diag_gaussian(
                     self.comp_mu[i], self.comp_var[i],
                     self.comp_mu[j], self.comp_var[j],

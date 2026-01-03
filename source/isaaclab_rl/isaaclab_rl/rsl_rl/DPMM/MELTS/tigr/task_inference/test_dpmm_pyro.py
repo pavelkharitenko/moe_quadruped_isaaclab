@@ -166,7 +166,7 @@ if __name__ == "__main__":
     # Generate synthetic latent data
     # -----------------------------
     z, true_labels = make_sample_data(
-        n_per_cluster=100,
+        n_per_cluster=200,
         centers=[(-4, 0), (0, 0), (4, 0)],
         std=0.6,
         device=device,
@@ -201,8 +201,8 @@ if __name__ == "__main__":
     test_dpmm_evolution(
         dpmm,
         z,
-        steps_per_update=200,
-        num_updates=1,
+        steps_per_update=100,
+        num_updates=3,
         num_laps=10,
         svi_steps=50,
     )
