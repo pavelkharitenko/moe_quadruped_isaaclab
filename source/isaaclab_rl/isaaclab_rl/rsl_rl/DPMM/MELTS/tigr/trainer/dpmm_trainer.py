@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.base_trainer import AugmentedTrainer as BaseTrainer
 
-import vis_utils.vis_utils.tb_logging as TB
+import vis_utils.tb_logging as TB
 
 TB.init(log_dir="./logs/vaetrainer/")
 

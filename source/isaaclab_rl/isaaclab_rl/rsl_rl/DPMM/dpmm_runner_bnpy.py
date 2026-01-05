@@ -516,14 +516,15 @@ class DPMMRunner(OnPolicyRunner):
             # DPMM-VAE training update:
 
             # sample batch from DPMM-Buffer according strategy Sc and pass sequentially to GRU:
-            batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,
-                                                          nw=self.dpmm_cfg.context_length)
+            #batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,nw=self.dpmm_cfg.context_length)
 
-            # update beta 
-            self.dpmm_trainer.alpha_kl_z = 
+            # update VAE's KL beta
+            #vae_beta = min(self.dpmm_cfg.warmup.beta_final,
+            #               self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
+            #self.dpmm_trainer.alpha_kl_z = vae_beta
 
-            self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
-
+            #self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+            #exit(0)
             # === PPO update ===
             start_update = time.time()
             loss_dict = self.alg.update()
