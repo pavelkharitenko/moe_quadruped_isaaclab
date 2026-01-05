@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
 import os
+import datetime
 import time
 import statistics
 import pandas as pd
@@ -24,16 +25,16 @@ from rsl_rl.modules import (
     StudentTeacherRecurrent,
 )
 
+# DPMM-VAE imports
 from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (DPMMReplayBuffer, Transition, LatentInjectedEnvWrapper, class_to_dict,
                                                 TrajectoryCollector)
 
-from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfg
+from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfgBnpy
 
-#from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.prediction_networks import DecoderMDP
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.prediction_networks import DecoderMDP
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_bnp import BNPModel
-
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_inference import DecoupledEncoder
-#from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
 
 
 class DPMMRunner(OnPolicyRunner):
@@ -167,8 +168,131 @@ class DPMMRunner(OnPolicyRunner):
 
         self.current_z = torch.zeros(env.num_envs, self.z_dim, device=device)
         """
+        dpmm_cfg = DpmmVaeCfgBnpy
+        self.dpmm_cfg = dpmm_cfg
+        self.dpmm_total_update_steps = 0
 
-        self.dpmm_cfg = DpmmVaeCfg
+        absolute_log_dir = os.path.abspath(  # logdir for DPMM-VAE training
+            f"./logs/dpmm/dpmm_logs_session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+        # DPMM-VAE buffer
+        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size, device=self.device)
+
+        # Initialize Bayesian Nonparametric Model (bnpy)
+        bnp_model = BNPModel(
+            save_dir=absolute_log_dir,
+            gamma0=dpmm_cfg.bnp_model.gamma0,
+            num_lap=dpmm_cfg.bnp_model.num_lap,
+            fit_interval=dpmm_cfg.bnp_model.fit_interval,
+            birth_kwargs=dict(
+                b_startLap=dpmm_cfg.bnp_model.birth.start_lap,
+                b_stopLap=dpmm_cfg.bnp_model.birth.stop_lap,
+                b_Kfresh=dpmm_cfg.bnp_model.birth.k_fresh,
+                b_minNumAtomsForNewComp=dpmm_cfg.bnp_model.birth.min_num_atoms_for_new_comp,
+                b_minNumAtomsForTargetComp=dpmm_cfg.bnp_model.birth.min_num_atoms_for_target_comp,
+                b_minNumAtomsForRetainComp=dpmm_cfg.bnp_model.birth.min_num_atoms_for_retain_comp,
+                b_minPercChangeInNumAtomsToReactivate=dpmm_cfg.bnp_model.birth.min_perc_change_to_reactivate,
+                b_debugOutputDir=dpmm_cfg.bnp_model.birth.debug_output_dir,
+                b_debugWriteHTML=dpmm_cfg.bnp_model.birth.debug_write_html,
+            ),
+            merge_kwargs=dict(
+                m_startLap=dpmm_cfg.bnp_model.merge.start_lap,
+                m_maxNumPairsContainingComp=dpmm_cfg.bnp_model.merge.max_num_pairs_containing_comp,
+                m_nLapToReactivate=dpmm_cfg.bnp_model.merge.n_lap_to_reactivate,
+                m_pair_ranking_procedure=dpmm_cfg.bnp_model.merge.pair_ranking_procedure,
+                m_pair_ranking_direction=dpmm_cfg.bnp_model.merge.pair_ranking_direction,
+            ),
+        )
+
+        # Derive dimensions from runner / env
+        obs_dim = num_obs  # from env.get_observations()
+        action_dim = self.env.num_actions
+        reward_dim = 1  # scalar reward (RL assumption)
+        state_dim = obs_dim  # state == observation
+        tasks_num = 2
+
+        shared_dim = (
+            state_dim +  # s_t
+            action_dim +  # a_t
+            reward_dim +  # r_t
+            state_dim +  # s_{t+1}
+            tasks_num  # task one-hot
+        )
+
+        # Encoder
+        encoder = DecoupledEncoder(
+            shared_dim=shared_dim,
+            encoder_input_dim=dpmm_cfg.time_steps * shared_dim,
+            latent_dim=dpmm_cfg.z_dim,
+            num_classes=tasks_num,
+            time_steps=dpmm_cfg.time_steps,
+            encoding_mode="trajectory",
+            timestep_combination="multiplication",
+            encoder_type="gru",
+            bnp_model=bnp_model,
+        )
+
+        # Decoder
+        decoder = DecoderMDP(
+            action_dim=action_dim,
+            state_dim=state_dim,
+            reward_dim=reward_dim,
+            z_dim=dpmm_cfg.z_dim,
+            net_complex=2,
+            state_reconstruction_clip=state_dim,
+        )
+
+        encoder.to(self.device)
+        decoder.to(self.device)
+
+        self.dpmm_trainer = AugmentedTrainer(
+            encoder=encoder,
+            decoder=decoder,
+            replay_buffer=self.dpmm_buffer,  # NOTE: streaming buffer
+            replay_buffer_augmented=None,
+            batch_size=dpmm_cfg.batch_size,
+            num_classes=tasks_num,
+            latent_dim=dpmm_cfg.z_dim,
+            timesteps=dpmm_cfg.time_steps,
+            lr_encoder=3e-4,
+            lr_decoder=3e-4,
+            alpha_kl_z=1e-4,
+            beta_euclid=5e-4,
+            gamma_sparsity=1e-3,
+            regularization_lambda=0.1,
+            use_state_diff=False,
+            state_reconstruction_clip=state_dim,
+            use_data_normalization=True,
+            train_val_percent=1.0,
+            eval_interval=50,
+            early_stopping_threshold=500,
+            experiment_log_dir=absolute_log_dir,
+            use_regularization_loss=True,
+            use_PCGrad=False,
+            PCGrad_option="true_task",
+            optimizer_class=torch.optim.Adam,
+            log_dir=absolute_log_dir,
+        )
+
+        # subset of envs that contribute to dpmm buffer
+        self.dpmm_selected_sample_envs = self.select_random_envs()
+
+    def select_random_envs(self):
+        """
+        Reselect subenvs from total available envs to fill DPMM's Off-Policy Buffer
+        """
+        frac = self.dpmm_cfg.num_envs_per_iter
+        total_envs = self.env.num_envs
+
+        # Compute number of envs to sample
+        n = max(1, int(round(frac * total_envs)))
+        n = min(n, total_envs)
+
+        # Randomly select env indices
+        env_indices = torch.randperm(total_envs, device=self.device)[:n]
+
+        print(f"selected {n}/{total_envs} envs:", env_indices)
+        return env_indices
 
     def log(self, locs: dict, width: int = 80, pad: int = 35):
         # Call superclass logger (prints losses, mean reward, etc.)
@@ -285,7 +409,6 @@ class DPMMRunner(OnPolicyRunner):
         obs, extras = self.env.get_observations()
         privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
         obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-
         self.train_mode()
 
         # === Initialize buffers ===
@@ -294,27 +417,15 @@ class DPMMRunner(OnPolicyRunner):
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
-        # DPMM-VAE buffer
-        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size, device=self.device)
-
         # one temporary trajectory per env
         self._dpmm_trajs = [[] for _ in range(self.env.num_envs)]
         prev_obs = obs.clone()  # save as "s" in first tuple (s,a,r,s')
-
-        # === CSV setup ===
-        csv_path = os.path.join(self.log_dir, "training_diagnostics.csv")
-        write_header = not os.path.exists(csv_path)
 
         # === Training loop ===
         start_iter = self.current_learning_iteration
         tot_iter = start_iter + num_learning_iterations
         for it in range(start_iter, tot_iter):
             start_time = time.time()
-
-            # select subset of envs for DPMM data collection (and shuffle for randomness):
-            n = self.dpmm_cfg.num_envs_per_iter
-            env_indices = torch.randperm(self.env.num_envs, device=self.device)[:n]
-            print("selected env indices", env_indices)
 
             # === Collect rollouts ===
             with torch.inference_mode():
@@ -327,9 +438,14 @@ class DPMMRunner(OnPolicyRunner):
                     obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
                     # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
+
+                    # first check if new subenvs should be sampled from tasks
+                    if self.dpmm_total_update_steps % self.dpmm_cfg.reselect_envs_interval == 0:
+                        self.dpmm_selected_sample_envs = self.select_random_envs()
+
                     next_obs = obs.clone()
 
-                    for i in env_indices:
+                    for i in self.dpmm_selected_sample_envs:
                         self._dpmm_trajs[i].append(
                             Transition(
                                 obs=prev_obs[i],
@@ -345,7 +461,7 @@ class DPMMRunner(OnPolicyRunner):
                     # flush completed/long trajectories into replay buffer
                     flush_list = []
 
-                    for i in env_indices:
+                    for i in self.dpmm_selected_sample_envs:
                         if dones[i] or len(self._dpmm_trajs[i]) >= self.dpmm_cfg.max_traj_len:
                             flush_list.append(self._dpmm_trajs[i])
                             self._dpmm_trajs[i] = []
@@ -369,11 +485,15 @@ class DPMMRunner(OnPolicyRunner):
                     cur_reward_sum += rewards
                     cur_episode_length += 1
                     done_ids = (dones > 0).nonzero(as_tuple=False)
+
                     if len(done_ids) > 0:
                         rewbuffer.extend(cur_reward_sum[done_ids][:, 0].cpu().numpy().tolist())
                         lenbuffer.extend(cur_episode_length[done_ids][:, 0].cpu().numpy().tolist())
                         cur_reward_sum[done_ids] = 0
                         cur_episode_length[done_ids] = 0
+
+                    # increment timesteps collected in env
+                    self.dpmm_total_update_steps += 1
 
                 collection_time = time.time() - start_time
 
@@ -387,6 +507,8 @@ class DPMMRunner(OnPolicyRunner):
                       f"last_reward={self.dpmm_buffer.buffer[-1].reward:.3f} | "
                       f"done={self.dpmm_buffer.buffer[-1].done}")
 
+                print("dpmm total update steps", self.dpmm_total_update_steps)
+
                 done_count = sum(t.done for t in self.dpmm_buffer.buffer)
                 print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer):.4f}")
                 print(f"DPMM done count = {done_count:.4f}")
@@ -397,61 +519,20 @@ class DPMMRunner(OnPolicyRunner):
             batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,
                                                           nw=self.dpmm_cfg.context_length)
 
+            # update beta 
+            self.dpmm_trainer.alpha_kl_z = 
+
+            self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+
             # === PPO update ===
             start_update = time.time()
             loss_dict = self.alg.update()
             learn_time = time.time() - start_update
             self.current_learning_iteration = it
 
-            # === Diagnostics: PPO internals ===
-            if hasattr(self.alg, "storage"):
-                adv = getattr(self.alg.storage, "advantages", None)
-                if adv is not None:
-                    print(f"[it {it}] Advantage mean={adv.mean():.4f}, std={adv.std():.4f}, "
-                          f"min={adv.min():.3f}, max={adv.max():.3f}")
-                values = getattr(self.alg.storage, "values", None)
-                if values is not None:
-                    print(f"[it {it}] Value mean={values.mean():.4f}, std={values.std():.4f}")
-
-            # === Prepare metrics ===
-            def safe(x):
-                return x.item() if torch.is_tensor(x) else float(x)
-
-            metrics = {
-                "iteration": it,
-                "num_envs": self.env.num_envs,
-                "steps_per_env": self.num_steps_per_env,
-                "collection_time": collection_time,
-                "learn_time": learn_time,
-                "entropy": safe(loss_dict.get("entropy", float("nan"))),
-                "policy_loss": safe(loss_dict.get("surrogate", float("nan"))),
-                "value_loss": safe(loss_dict.get("value_function", float("nan"))),
-                "learning_rate": safe(getattr(self.alg.optimizer.param_groups[0], "lr", float("nan"))),
-                "mean_reward": statistics.mean(rewbuffer) if len(rewbuffer) > 0 else float("nan"),
-                "mean_ep_len": statistics.mean(lenbuffer) if len(lenbuffer) > 0 else float("nan"),
-            }
-
-            # === Write metrics to CSV ===
             if self.log_dir is not None and not self.disable_logs:
-                write_header = not os.path.exists(csv_path)
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(metrics.keys()))
-                    if write_header:
-                        writer.writeheader()
-                    writer.writerow(metrics)
-
                 # log to tensorboard or other
                 self.log(locals())
-
-            # === Print periodic buffer sanity check ===
-            if it % 20 == 0:
-                total_expected = self.env.num_envs * self.num_steps_per_env
-                if hasattr(self.alg.storage, "observations"):
-                    obs_buf = self.alg.storage.observations
-                    print(f"[it {it}] storage.obs shape={tuple(obs_buf.shape)}, expected batch={total_expected}")
-                print(
-                    f"[it {it}] mean reward buffer={metrics['mean_reward']:.3f}, mean value_loss={metrics['value_loss']:.3f}"
-                )
 
             # === Save model occasionally ===
             if it % self.save_interval == 0:

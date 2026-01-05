@@ -4,16 +4,16 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-import rlkit.torch.pytorch_util as ptu
+#import rlkit.torch.pytorch_util as ptu
 
-from rlkit.core import logger
+#from rlkit.core import logger
 from tqdm import tqdm
 
-from tigr import stacked_replay_buffer, PCGradOptimizer
-from tigr.task_inference import base_inference as task_inference
-from tigr.task_inference import prediction_networks
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr import stacked_replay_buffer, PCGradOptimizer
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference import base_inference as task_inference
+from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference import prediction_networks
 
-import vis_utils.tb_logging as TB
+#import vis_utils.tb_logging as TB
 
 
 def weighting_fun(loss_array, c=1., m=1.):
@@ -22,11 +22,12 @@ def weighting_fun(loss_array, c=1., m=1.):
 
 
 class AugmentedTrainer:
+
     def __init__(self,
-                 encoder : task_inference.DecoupledEncoder,
-                 decoder : prediction_networks.DecoderMDP,
-                 replay_buffer : stacked_replay_buffer.StackedReplayBuffer,
-                 replay_buffer_augmented : stacked_replay_buffer.StackedReplayBuffer,
+                 encoder: task_inference.DecoupledEncoder,
+                 decoder: prediction_networks.DecoderMDP,
+                 replay_buffer: stacked_replay_buffer.StackedReplayBuffer,
+                 replay_buffer_augmented: stacked_replay_buffer.StackedReplayBuffer,
                  batch_size,
                  num_classes,
                  latent_dim,
@@ -40,19 +41,16 @@ class AugmentedTrainer:
                  use_state_diff,
                  state_reconstruction_clip,
                  use_data_normalization,
-
                  train_val_percent,
                  eval_interval,
                  early_stopping_threshold,
                  experiment_log_dir,
-
                  use_regularization_loss,
-
                  use_PCGrad=False,
                  PCGrad_option='random_prob_task',
                  optimizer_class=optim.Adam,
-                 log_dir=None
-                 ):
+                 log_dir=None):
+
         self.encoder = encoder
         self.decoder = decoder
         self.replay_buffer = replay_buffer
@@ -118,7 +116,6 @@ class AugmentedTrainer:
         # Reset lowest loss for mixture
         self.lowest_loss_epoch = 0
         self.lowest_loss = np.inf
-
         '''
         MIXTURE TRAINING EPOCHS
         '''
@@ -177,7 +174,7 @@ class AugmentedTrainer:
         mean_matrix = torch.abs(means[:, None, :] - means[None, :, :])
         stddev_matrix = op_(stddevs[:, None, :]) + op_(stddevs[None, :, :])
 
-        distances_matrix = torch.sum(torch.clamp(mean_matrix - stddev_factor * stddev_matrix, min=0) ** 2, dim=-1)
+        distances_matrix = torch.sum(torch.clamp(mean_matrix - stddev_factor * stddev_matrix, min=0)**2, dim=-1)
         per_class_distances = distances_matrix.sum(dim=1)
 
         return per_class_distances

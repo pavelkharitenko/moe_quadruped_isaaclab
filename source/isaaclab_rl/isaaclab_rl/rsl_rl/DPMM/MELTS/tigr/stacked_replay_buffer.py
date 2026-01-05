@@ -1,10 +1,12 @@
 import numpy as np
 import torch
-import rlkit.torch.pytorch_util as ptu
+#import rlkit.torch.pytorch_util as ptu
 
 
 class StackedReplayBuffer:
-    def __init__(self, max_replay_buffer_size,
+
+    def __init__(self,
+                 max_replay_buffer_size,
                  time_steps,
                  episode_length,
                  observation_dim,
@@ -115,18 +117,16 @@ class StackedReplayBuffer:
         return np.where(self._allowed_points)[0]
 
     def sample_data(self, indices):
-        return dict(
-            observations=self._observations[indices],
-            next_observations=self._next_obs[indices],
-            actions=self._actions[indices],
-            rewards=self._rewards[indices],
-            task_indicators=self._task_indicators[indices],
-            next_task_indicators=self._next_task_indicators[indices],
-            sparse_rewards=self._sparse_rewards[indices],
-            terminals=self._terminals[indices],
-            true_tasks=self._true_task[indices],
-            base_tasks_indicators=self._base_task_indicators[indices]
-        )
+        return dict(observations=self._observations[indices],
+                    next_observations=self._next_obs[indices],
+                    actions=self._actions[indices],
+                    rewards=self._rewards[indices],
+                    task_indicators=self._task_indicators[indices],
+                    next_task_indicators=self._next_task_indicators[indices],
+                    sparse_rewards=self._sparse_rewards[indices],
+                    terminals=self._terminals[indices],
+                    true_tasks=self._true_task[indices],
+                    base_tasks_indicators=self._base_task_indicators[indices])
 
     def get_indices(self, points, batch_size, prio=None):
         # filter points that may cause overlaps
@@ -147,7 +147,6 @@ class StackedReplayBuffer:
             raise NotImplementedError(f'Sampling method {prio} has not been implemented yet.')
 
         return indices
-
 
     # Single transition sample functions
 
@@ -303,7 +302,7 @@ class StackedReplayBuffer:
         elif self.encoding_mode == 'transitionSharedY' or self.encoding_mode == 'transitionIndividualY':
             pass
 
-        return encoder_input.to(ptu.device)
+        return encoder_input.to(data.device)
 
     def get_stats(self):
         values_dict = dict(

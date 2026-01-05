@@ -2,12 +2,12 @@ import numpy as np
 import torch
 import torch.optim
 import time
-import rlkit.torch.pytorch_util as ptu
+#import rlkit.torch.pytorch_util as ptu
 
 
 class PCGradOptimizer():
 
-    def __init__(self, optimizers : [torch.optim], verbose=False):
+    def __init__(self, optimizers: [torch.optim], verbose=False):
 
         self.optimizers = optimizers if type(optimizers) is list else [optimizers]
         self.verbose = verbose
@@ -27,7 +27,7 @@ class PCGradOptimizer():
             # Reset all optimizers
             for optimizer in self.optimizers:
                 optimizer.zero_grad()
-            loss.backward(retain_graph=((loss_index < len(losses)-1) or retain_graph))
+            loss.backward(retain_graph=((loss_index < len(losses) - 1) or retain_graph))
 
             # Extract gradients for all optimizers, for all param groups, for all params
             optimizer_gradients = []
@@ -39,13 +39,14 @@ class PCGradOptimizer():
                         if p.grad is not None and p.requires_grad:
                             grad = p.grad
                             if grad.is_sparse:
-                                raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
+                                raise RuntimeError(
+                                    'Adam does not support sparse gradients, please consider SparseAdam instead')
                             param_gradients.append(grad.data.clone().reshape(-1).to())
-						
+
                         # Store zeros in case gradient is needed somewhere else (then we simply have a zero multiplication but full shape)
                         if p.grad is None and p.requires_grad:
                             param_gradients.append(torch.zeros_like(p.data).reshape(-1).to())
-							
+
                     group_gradients.append(torch.cat(param_gradients))
                 optimizer_gradients.append(torch.cat(group_gradients))
             task_gradients.append(torch.cat(optimizer_gradients))
@@ -57,11 +58,14 @@ class PCGradOptimizer():
         # Compute per-task gradients.
         t1 = time.time()
         original_task_gradients = task_gradients.clone()
-        zero_tensor = ptu.zeros(1)
+        zero_tensor = torch.zeros(1, device=task_gradients.device)
+
         for k in range(num_tasks):
             # Parallel computation of projections using matrix multiplication
             inner_product = torch.matmul(task_gradients, original_task_gradients[k, :])
-            proj_direction = torch.min(inner_product / (torch.matmul(original_task_gradients[k, :], original_task_gradients[k, :]) + 1e-12), zero_tensor)
+            proj_direction = torch.min(
+                inner_product / (torch.matmul(original_task_gradients[k, :], original_task_gradients[k, :]) + 1e-12),
+                zero_tensor)
             task_gradients -= (proj_direction * original_task_gradients[k, :][:, None]).t()
         if self.verbose: print(f'Computation projection: {time.time() - t1} s')
 

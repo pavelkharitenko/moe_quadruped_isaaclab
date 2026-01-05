@@ -9,6 +9,7 @@ from collections import deque
 
 from dataclasses import dataclass
 
+
 @dataclass
 class Transition:
     obs: torch.Tensor
@@ -17,7 +18,6 @@ class Transition:
     next_obs: torch.Tensor
     done: torch.Tensor
     task_id: int | None
-
 
 
 class DPMMReplayBuffer:
@@ -33,7 +33,6 @@ class DPMMReplayBuffer:
         self.device = device
         self.buffer = deque(maxlen=size)
 
-    
     @torch.no_grad()
     def add(
         self,
@@ -53,8 +52,7 @@ class DPMMReplayBuffer:
                 next_obs=next_obs.detach().to(self.device),
                 done=done.detach().to(self.device),
                 task_id=task_id,
-            )
-        )
+            ))
 
     @torch.no_grad()
     def add_batch(
@@ -83,10 +81,8 @@ class DPMMReplayBuffer:
                 task_id=task_id,
             )
 
-
     def __len__(self):
         return len(self.buffer)
-    
 
     def sample_indices_priority(self, batch_size):
         T = len(self.buffer)
@@ -98,7 +94,6 @@ class DPMMReplayBuffer:
         print("indices", indices)
 
         return indices.tolist()
-
 
     def sample_contexts(self, batch_size, nw):
         """
@@ -113,149 +108,126 @@ class DPMMReplayBuffer:
 
         for t in indices:
             start = max(0, t - nw + 1)
-            window = list(self.buffer)[start : t + 1]
+            window = list(self.buffer)[start:t + 1]
 
             contexts.append(window)
 
         return contexts
 
-
-    def sample_contexts_priority(self, batch_size, nw, priority=True):
+    def sample_random_few_step_batch(
+        self,
+        indices,
+        batch_size,
+        nw,
+        normalize=False,
+        prio=None,
+        return_sac_data=False,
+    ):
         """
-        Sample (batch_size)-amount of contexts C_t according to paper's sampling strategy Sc,
-        where C_t = (c_t-nw, ... , c_t-1, c_t) and each c_t = (s, a, r, s')t.
-        """
-        T = len(self.buffer)
+        API-compatible replacement for StackedReplayBuffer.sample_random_few_step_batch.
 
-        # 1) Sample start index t:
-
-        if priority:    # create T weights: (w1,...,wT) to sample context_t (eq. 31):
-            weights = np.arange(1, T + 1, dtype=np.float64)
-            weights /= T*(T+1) # divide by sum of probs
-            t_context = np.random.choice(T, size=batch_size, p=weights)
-        else: 
-            t_context = np.random.randint(0, T, size=batch_size)
-
-        # 2) Create contexts C_t:
-        contexts = []
-        for t in t_context:
-            start = max(0, t - nw + 1) # make sure context starts not at negative transition index
-            contexts.append(list(self.buffer)[start:(t + 1)])
-
-        return contexts
-
-
-
-    
-
-    def sample_random_few_step_batch(self, indices=None, batch_size=128, normalize=False, prio=None):
-        """
-        Sample a batch of trajectories from the buffer.
-        
-        Args:
-            indices: Specific indices to sample from (if None, sample from all)
-            batch_size: Number of trajectories to sample
-            normalize: Whether to normalize the data (not implemented)
-            prio: Priority sampling weights (not implemented)
-            
         Returns:
-            Tuple of (data_dict, data_dict) where each data_dict contains:
-                - observations: array of shape (B, T, obs_dim)
-                - actions: array of shape (B, T, act_dim)
-                - rewards: array of shape (B, T, 1)
-                - next_observations: array of shape (B, T, obs_dim)
-                - terminals: array of zeros with shape (B, T, 1)
-                - true_tasks: array containing task information
+            e_data: dict with shape [B, T, D]
+            d_data: same structure, last timestep used by decoder
         """
-        # Select indices to sample
-        if indices is None:
-            indices = np.random.choice(len(self.buffer), size=batch_size, replace=False)
-        else:
-            indices = np.random.choice(indices, size=batch_size, replace=False)
 
-        # Extract the sampled trajectories
-        data = [self.buffer[i] for i in indices]
+        # Sample contexts using your priority scheme
+        contexts = self.sample_contexts(batch_size, nw)
+        assert contexts is not None, "Not enough data to sample contexts"
 
-        # Get dimensions
-        B = len(data)  # Batch size
-        T = len(data[0])  # Trajectory length
+        B = len(contexts)
+        T = nw
 
-        # Stack the trajectory data into arrays
-        obs = np.stack([[step["obs"] for step in traj] for traj in data])
-        act = np.stack([[step["act"] for step in traj] for traj in data])
-        rew = np.stack([[step["rew"] for step in traj] for traj in data])
-        rew = np.expand_dims(rew, axis=-1)  # Add reward dimension
-        next_obs = np.stack([[step["next_obs"] for step in traj] for traj in data])
-        terminals = np.zeros_like(rew)  # All zeros (no terminal states)
+        # Allocate numpy arrays (encoder expects numpy here)
+        obs = []
+        actions = []
+        rewards = []
+        next_obs = []
+        terminals = []
+        true_tasks = []
 
-        # Extract task information
-        true_tasks = np.array([[[{"base_task": step["task_subtype_id"]}] for step in traj] for traj in data])
+        for ctx in contexts:
+            # Pad context from the left if needed
+            pad_len = T - len(ctx)
+            if pad_len > 0:
+                pad = [ctx[0]] * pad_len
+                ctx = pad + ctx
 
-        # Create data dictionary
-        data_dict = {
-            'observations': obs,
-            'actions': act,
-            'rewards': rew,
-            'next_observations': next_obs,
-            'terminals': terminals,
-            'true_tasks': true_tasks,
-        }
+            obs.append([c.obs.cpu().numpy() for c in ctx])
+            actions.append([c.action.cpu().numpy() for c in ctx])
+            rewards.append([c.reward.cpu().numpy() for c in ctx])
+            next_obs.append([c.next_obs.cpu().numpy() for c in ctx])
+            terminals.append([c.done.cpu().numpy() for c in ctx])
 
-        return (data_dict, data_dict)  # Return tuple for compatibility
+            # Match original true_task format: dict with base_task
+            true_tasks.append([[{"base_task": int(c.task_id), "specification": 0}] for c in ctx])
 
-    def make_encoder_data(self, data_dict, batch_size):
+        # Convert to arrays
+        e_data = dict(
+            observations=np.asarray(obs, dtype=np.float32),
+            actions=np.asarray(actions, dtype=np.float32),
+            rewards=np.asarray(rewards, dtype=np.float32),
+            next_observations=np.asarray(next_obs, dtype=np.float32),
+            terminals=np.asarray(terminals, dtype=np.uint8),
+            true_tasks=np.asarray(true_tasks, dtype=object),
+        )
+
+        # Decoder only uses the last step
+        d_data = e_data
+
+        return e_data, d_data
+
+    def make_encoder_data(self, data, batch_size, encoding_mode="trajectory", permute_samples=False):
         """
-        Prepare data for the encoder by concatenating states, actions, rewards, 
-        next states, and one-hot task encodings.
-        
-        Args:
-            data_dict: Dictionary containing trajectory data
-            batch_size: Number of trajectories in the batch
-            
-        Returns:
-            Tensor of shape (batch_size, time_steps * feature_dim) for encoder input
+        Matches StackedReplayBuffer.make_encoder_data behavior.
+
+        Input:
+            data: dict from sample_random_few_step_batch
+        Output:
+            Tensor ready for encoder
         """
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Extract components from data dictionary
-        states = torch.tensor(data_dict["observations"], dtype=torch.float32, device=device)
-        actions = torch.tensor(data_dict["actions"], dtype=torch.float32, device=device)
-        rewards = torch.tensor(data_dict["rewards"], dtype=torch.float32, device=device)
-        next_states = torch.tensor(data_dict["next_observations"], dtype=torch.float32, device=device)
+        observations = torch.from_numpy(data["observations"]).float()
+        actions = torch.from_numpy(data["actions"]).float()
+        rewards = torch.from_numpy(data["rewards"]).float()
+        next_observations = torch.from_numpy(data["next_observations"]).float()
 
-        # Extract task information and create one-hot encodings
-        true_tasks_raw = data_dict["true_tasks"]  # shape: (B, T, 1)
-        task_subtype_ids = np.array([[step[0]["base_task"] for step in traj] for traj in true_tasks_raw])
-        task_subtype_ids = torch.tensor(task_subtype_ids, dtype=torch.long, device=device)
-        one_hot = torch.nn.functional.one_hot(task_subtype_ids, num_classes=9).float()
+        # Drop last timestep (same as original)
+        obs_enc = observations[:, :-1, :]
+        act_enc = actions[:, :-1, :]
+        rew_enc = rewards[:, :-1, :]
+        next_obs_enc = next_observations[:, :-1, :]
 
-        # Concatenate all components along the feature dimension
-        sequence = torch.cat([states, actions, rewards, next_states, one_hot], dim=-1)
+        encoder_input = torch.cat(
+            [obs_enc, act_enc, rew_enc, next_obs_enc],
+            dim=-1,
+        )
 
-        # Flatten the time and feature dimensions for encoder input
-        B, T, D = sequence.shape
-        sequence = sequence.reshape(B, T * D)
+        if permute_samples:
+            perm = torch.randperm(encoder_input.shape[1])
+            encoder_input = encoder_input[:, perm]
 
-        # Verify batch size consistency
-        assert B == batch_size, f"Batch size mismatch: expected {batch_size}, got {B}"
+        if encoding_mode == "trajectory":
+            encoder_input = encoder_input.view(batch_size, -1)
 
-        return sequence
+        return encoder_input.to(self.device)
 
     def get_train_val_indices(self, train_val_percent):
         """
-        Split the buffer indices into training and validation sets.
-        
-        Args:
-            train_val_percent: Percentage of data to use for training (0-1)
-            
-        Returns:
-            Tuple of (train_indices, validation_indices)
+        Returns train/val indices over valid buffer positions.
+        Compatible with encoder training loops.
         """
+
         total = len(self.buffer)
         indices = np.arange(total)
+
         np.random.shuffle(indices)
         split = int(total * train_val_percent)
-        return indices[:split], indices[split:]
+
+        train_indices = indices[:split]
+        val_indices = indices[split:]
+
+        return train_indices, val_indices
 
 
 class LatentInjectedEnvWrapper:
