@@ -70,5 +70,4 @@ tests/
 # Docker history
 .isaac-lab-docker-history
 
-# nested
-vis_utils/
+
