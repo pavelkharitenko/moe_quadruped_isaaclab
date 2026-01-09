@@ -57,7 +57,7 @@ class AugmentedTrainer(BaseTrainer):
 
     def train(self, mixture_steps, w_method='val_value_based', current_epoch=0):
         self.current_epoch = current_epoch
-        print("Epoch:", self.current_epoch)
+        print("DPMM-VAE Epoch:", self.current_epoch)
         train_indices, val_indices = self.replay_buffer.get_train_val_indices(self.train_val_percent)
 
         # Reset lowest loss for mixture
