@@ -26,8 +26,7 @@ from rsl_rl.modules import (
 )
 
 # DPMM-VAE imports
-from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (DPMMReplayBuffer, Transition, LatentInjectedEnvWrapper, class_to_dict,
-                                                TrajectoryCollector)
+from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (DPMMReplayBuffer, Transition, LatentInjectedEnvWrapper, class_to_dict)
 
 from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfgBnpy
 
@@ -150,22 +149,7 @@ class DPMMRunner(OnPolicyRunner):
         # DPMM-VAE initialization
         # --- Context encoding ---
         """
-        self.context_len = encoder_cfg["context_len"]
-        self.context_buffers = PerEnvContextBuffer(
-            num_envs=env.num_envs,
-            context_len=self.context_len,
-            obs_dim=env.num_obs,
-            action_dim=env.num_actions,
-        )
-
-        # --- VAE + DPMM ---
-        self.encoder = DecoupledEncoder(...)
-        self.decoder = DecoderMDP(...)
-        self.trainer = AugmentedTrainer(...)
-
-        self.replay_buffer = MinimalReplayBuffer(...)
         self.z_dim = encoder_cfg["z_dim"]
-
         self.current_z = torch.zeros(env.num_envs, self.z_dim, device=device)
         """
         dpmm_cfg = DpmmVaeCfgBnpy
@@ -176,7 +160,9 @@ class DPMMRunner(OnPolicyRunner):
             f"./logs/dpmm/dpmm_logs_session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
         # DPMM-VAE buffer
-        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size, device=self.device)
+        self.dpmm_buffer = DPMMReplayBuffer(size=self.dpmm_cfg.dpmm_buffer_size,
+                                            nw=self.dpmm_cfg.context_length,
+                                            device=self.device)
 
         # Initialize Bayesian Nonparametric Model (bnpy)
         bnp_model = BNPModel(
@@ -209,14 +195,14 @@ class DPMMRunner(OnPolicyRunner):
         action_dim = self.env.num_actions
         reward_dim = 1  # scalar reward (RL assumption)
         state_dim = obs_dim  # state == observation
-        tasks_num = 2
+        tasks_num = self.dpmm_cfg.num_tasks
 
         shared_dim = (
             state_dim +  # s_t
             action_dim +  # a_t
             reward_dim +  # r_t
             state_dim +  # s_{t+1}
-            tasks_num  # task one-hot
+            1  #tasks_num  # task one-hot
         )
 
         # Encoder
@@ -271,6 +257,7 @@ class DPMMRunner(OnPolicyRunner):
             use_PCGrad=False,
             PCGrad_option="true_task",
             optimizer_class=torch.optim.Adam,
+            device=self.device,
             log_dir=absolute_log_dir,
         )
 
@@ -440,23 +427,25 @@ class DPMMRunner(OnPolicyRunner):
                     # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
 
                     # first check if new subenvs should be sampled from tasks
+                    # TODO flush remaining trajectories or set _dpm_trajs list empty when resetting
                     if self.dpmm_total_update_steps % self.dpmm_cfg.reselect_envs_interval == 0:
                         self.dpmm_selected_sample_envs = self.select_random_envs()
 
                     next_obs = obs.clone()
 
                     for i in self.dpmm_selected_sample_envs:
+                        task_onehot = prev_obs[i][-self.dpmm_cfg.num_tasks:]
                         self._dpmm_trajs[i].append(
                             Transition(
                                 obs=prev_obs[i],
                                 action=actions[i],
-                                reward=rewards[i],
+                                reward=rewards[i].view(1),
                                 next_obs=next_obs[i],
-                                done=dones[i],
-                                task_id=None,  # or infos[i].get("task_id")
+                                done=dones[i].view(1),
+                                task_id=task_onehot,  # or infos[i].get("task_id")
                             ))
 
-                    prev_obs = next_obs
+                    prev_obs = next_obs.clone()
 
                     # flush completed/long trajectories into replay buffer
                     flush_list = []
@@ -502,16 +491,16 @@ class DPMMRunner(OnPolicyRunner):
                     self.alg.compute_returns(privileged_obs)
 
             # log DPMM-buffer statistics
-            if it % self.dpmm_cfg.log_interval == 0 and len(self.dpmm_buffer) > 0:
+            if len(self.dpmm_buffer) > 3:
                 print(f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)} | "
-                      f"last_reward={self.dpmm_buffer.buffer[-1].reward:.3f} | "
-                      f"done={self.dpmm_buffer.buffer[-1].done}")
+                      f"last_reward={self.dpmm_buffer.buffer[-2].reward} | "
+                      f"done={self.dpmm_buffer.buffer[-2].done}")
 
                 print("dpmm total update steps", self.dpmm_total_update_steps)
 
                 done_count = sum(t.done for t in self.dpmm_buffer.buffer)
-                print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer):.4f}")
-                print(f"DPMM done count = {done_count:.4f}")
+                print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer)}")
+                print(f"DPMM done count = {done_count}")
 
             # DPMM-VAE training update:
 
@@ -519,12 +508,14 @@ class DPMMRunner(OnPolicyRunner):
             #batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,nw=self.dpmm_cfg.context_length)
 
             # update VAE's KL beta
-            #vae_beta = min(self.dpmm_cfg.warmup.beta_final,
-            #               self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
-            #self.dpmm_trainer.alpha_kl_z = vae_beta
 
-            #self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
-            #exit(0)
+            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length:
+                vae_beta = min(self.dpmm_cfg.warmup.beta_final,
+                               self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
+                self.dpmm_trainer.alpha_kl_z = vae_beta
+
+                self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+                #exit(0)
             # === PPO update ===
             start_update = time.time()
             loss_dict = self.alg.update()

@@ -49,8 +49,10 @@ class AugmentedTrainer:
                  use_PCGrad=False,
                  PCGrad_option='random_prob_task',
                  optimizer_class=optim.Adam,
+                 device=None,
                  log_dir=None):
 
+        self.device = device
         self.encoder = encoder
         self.decoder = decoder
         self.replay_buffer = replay_buffer

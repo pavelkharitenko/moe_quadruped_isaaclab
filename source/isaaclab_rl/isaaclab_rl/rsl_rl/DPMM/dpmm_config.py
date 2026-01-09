@@ -24,6 +24,7 @@ class DpmmVaeCfgBnpy:
     # General / logging
     log_interval = 10
     reselect_envs_interval = 1000
+    num_tasks = 2
 
     # DPMM Buffer & Trajectory
     num_envs_per_iter = 0.2  # fraction percentage of total envs to sample trajectories from
@@ -34,12 +35,12 @@ class DpmmVaeCfgBnpy:
 
     # Environment / model dims
     trajectory_length = 64
-    time_steps = 64
+    time_steps = 25
 
     z_dim = 12
 
     # NOTE: legacy MELTS used this for GMM/DPMM
-    state_dim = 247  # obs_dim + z_dim in old setup
+    #state_dim = 247  # obs_dim + z_dim in old setup
 
     # BNP / DPMM (bnpy)
     class bnp_model:
@@ -67,7 +68,7 @@ class DpmmVaeCfgBnpy:
 
     # Training
     class trainer:
-        batch_size = 1024
+        batch_size = 20
         batch_size_rollout = 256
         lr_decoder = 3e-4
         lr_encoder = 3e-4

@@ -28,10 +28,11 @@ class DPMMReplayBuffer:
     dictionary contains observation, action, reward, next observation, and task info.
     """
 
-    def __init__(self, size: int, device="cpu"):
+    def __init__(self, size: int, nw, device="cpu"):
         self.size = size
         self.device = device
         self.buffer = deque(maxlen=size)
+        self.nw = nw  # context length
 
     @torch.no_grad()
     def add(
@@ -118,7 +119,6 @@ class DPMMReplayBuffer:
         self,
         indices,
         batch_size,
-        nw,
         normalize=False,
         prio=None,
         return_sac_data=False,
@@ -132,11 +132,11 @@ class DPMMReplayBuffer:
         """
 
         # Sample contexts using your priority scheme
-        contexts = self.sample_contexts(batch_size, nw)
+        contexts = self.sample_contexts(batch_size, self.nw)
         assert contexts is not None, "Not enough data to sample contexts"
 
         B = len(contexts)
-        T = nw
+        T = self.nw
 
         # Allocate numpy arrays (encoder expects numpy here)
         obs = []
@@ -160,7 +160,7 @@ class DPMMReplayBuffer:
             terminals.append([c.done.cpu().numpy() for c in ctx])
 
             # Match original true_task format: dict with base_task
-            true_tasks.append([[{"base_task": int(c.task_id), "specification": 0}] for c in ctx])
+            true_tasks.append([[{"base_task": int(torch.argmax(c.task_id).item()), "specification": 0}] for c in ctx])
 
         # Convert to arrays
         e_data = dict(
@@ -193,10 +193,10 @@ class DPMMReplayBuffer:
         next_observations = torch.from_numpy(data["next_observations"]).float()
 
         # Drop last timestep (same as original)
-        obs_enc = observations[:, :-1, :]
-        act_enc = actions[:, :-1, :]
-        rew_enc = rewards[:, :-1, :]
-        next_obs_enc = next_observations[:, :-1, :]
+        obs_enc = observations.detach().clone()[:, :-1, :]
+        act_enc = actions.detach().clone()[:, :-1, :]
+        rew_enc = rewards.detach().clone()[:, :-1, :]
+        next_obs_enc = next_observations.detach().clone()[:, :-1, :]
 
         encoder_input = torch.cat(
             [obs_enc, act_enc, rew_enc, next_obs_enc],
@@ -288,7 +288,7 @@ class LatentInjectedEnvWrapper:
         return getattr(self.env, attr)
 
 
-class TrajectoryCollector:
+class TrajectoryCollector1:
     """
     Collects trajectories from the environment using a policy.
     
