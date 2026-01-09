@@ -197,18 +197,20 @@ class DPMMRunner(OnPolicyRunner):
         state_dim = obs_dim  # state == observation
         tasks_num = self.dpmm_cfg.num_tasks
 
-        shared_dim = (
+        transition_dim = (
             state_dim +  # s_t
             action_dim +  # a_t
             reward_dim +  # r_t
             state_dim +  # s_{t+1}
-            1  #tasks_num  # task one-hot
+            tasks_num  # task one-hot
         )
+
+        shared_dim = self.dpmm_cfg.shared_dim
 
         # Encoder
         encoder = DecoupledEncoder(
             shared_dim=shared_dim,
-            encoder_input_dim=dpmm_cfg.time_steps * shared_dim,
+            encoder_input_dim=dpmm_cfg.time_steps * transition_dim,
             latent_dim=dpmm_cfg.z_dim,
             num_classes=tasks_num,
             time_steps=dpmm_cfg.time_steps,
@@ -491,10 +493,10 @@ class DPMMRunner(OnPolicyRunner):
                     self.alg.compute_returns(privileged_obs)
 
             # log DPMM-buffer statistics
-            if len(self.dpmm_buffer) > 3:
+            if len(self.dpmm_buffer) > 0:
                 print(f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)} | "
-                      f"last_reward={self.dpmm_buffer.buffer[-2].reward} | "
-                      f"done={self.dpmm_buffer.buffer[-2].done}")
+                      f"last_reward={self.dpmm_buffer.buffer[-1].reward} | "
+                      f"done={self.dpmm_buffer.buffer[-1].done}")
 
                 print("dpmm total update steps", self.dpmm_total_update_steps)
 

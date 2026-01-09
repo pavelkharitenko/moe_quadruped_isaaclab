@@ -35,9 +35,11 @@ class DpmmVaeCfgBnpy:
 
     # Environment / model dims
     trajectory_length = 64
-    time_steps = 25
+    time_steps = 23
 
-    z_dim = 12
+    # Encoder & Decoder
+    shared_dim = 128  # VAE encoder's inner layers size
+    z_dim = 12  # latent dim
 
     # NOTE: legacy MELTS used this for GMM/DPMM
     #state_dim = 247  # obs_dim + z_dim in old setup

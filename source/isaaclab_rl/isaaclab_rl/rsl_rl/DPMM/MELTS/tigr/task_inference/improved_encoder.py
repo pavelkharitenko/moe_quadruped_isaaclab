@@ -6,6 +6,7 @@ import numpy as np
 
 
 class GruAttentionEncoder(nn.Module):
+
     def __init__(self, input_size, output_size, time_steps, encoding_mode):
         super().__init__()
         # Note: encoding mode is automatically set to trajectory
@@ -33,17 +34,17 @@ class GruAttentionEncoder(nn.Module):
         return hidden
 
     def init_hidden(self, batch_size, device):
-        return torch.zeros(
-            1, batch_size, self.output_size, device=device
-        )
+        return torch.zeros(1, batch_size, self.output_size, device=device)
 
 
 class Flatten(nn.Module):
+
     def forward(self, input):
         return input.view(input.size(0), -1)
 
 
 class ConvAttentionEncoder(nn.Module):
+
     def __init__(self, input_size, output_size, time_steps, encoding_mode):
         super().__init__()
         # Note: encoding mode is automatically set to transitionSharedY
@@ -52,12 +53,8 @@ class ConvAttentionEncoder(nn.Module):
         self.time_steps = time_steps
         self.encoding_mode = encoding_mode
 
-        self.conv_layer = torch.nn.Sequential(
-            nn.Conv1d(1, self.output_size, self.input_size, self.input_size),
-            nn.ReLU(),
-            nn.Conv1d(self.output_size, self.output_size, 1, 1),
-            nn.ReLU()
-        )
+        self.conv_layer = torch.nn.Sequential(nn.Conv1d(1, self.output_size, self.input_size, self.input_size),
+                                              nn.ReLU(), nn.Conv1d(self.output_size, self.output_size, 1, 1), nn.ReLU())
 
         self.attn = nn.Conv1d(self.output_size, 1, 1, 1)
 
@@ -130,7 +127,8 @@ class PositionalEncoding(nn.Module):
         position = torch.arange(0, self.max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, self.input_size, 2).float() * (-np.log(10000.0) / self.input_size))
         pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term) if self.input_size % 2 == 0 else torch.cos(position * div_term)[:, :-1]
+        pe[:, 1::2] = torch.cos(position * div_term) if self.input_size % 2 == 0 else torch.cos(position *
+                                                                                                div_term)[:, :-1]
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer('pe', pe)
 

@@ -77,7 +77,7 @@ class AugmentedTrainer(BaseTrainer):
 
             self._n_train_steps_mixture += 1
 
-        logger.record_tabular('Mixture_steps', mixture_training_step + 1)
+        #logger.record_tabular('Mixture_steps', mixture_training_step + 1)
         '''
         DPMM TRAINING EPOCHS
         '''
@@ -113,13 +113,17 @@ class AugmentedTrainer(BaseTrainer):
 
         terminals = torch.as_tensor(d_data["terminals"], dtype=torch.float32, device=self.device)[:, 1:, :]
 
-        # Extract task labels (keep behavior identical)
-        true_task = np.array(
-            [a["base_task"] for a in d_data["true_tasks"][:, -1, 0]],
-            dtype=np.int64,
+        true_tasks = torch.as_tensor(
+            d_data["task_ids"],
+            dtype=torch.float32,
+            device=self.device,
         )
 
-        targets = torch.as_tensor(true_task, dtype=torch.long, device=self.device)
+        # take task from last timestep
+        last_task_onehot = true_tasks[:, -1, :]  # [B, n_tasks]
+
+        # convert one-hot → class index
+        targets = torch.argmax(last_task_onehot, dim=-1)  # [B]
 
         unique_tasks = torch.unique(targets).tolist()
 
@@ -260,10 +264,10 @@ class AugmentedTrainer(BaseTrainer):
                                              (torch.sum(elbo) / self.batch_size).item(),
                                              global_step=TB.TI_LOG_STEP)
             TB.TENSORBOARD_LOGGER.add_scalar('training/ti_mixture_state_losses',
-                                             total_state_loss.item(),
+                                             total_state_loss,
                                              global_step=TB.TI_LOG_STEP)
             TB.TENSORBOARD_LOGGER.add_scalar('training/ti_mixture_reward_losses',
-                                             total_reward_loss.item(),
+                                             total_reward_loss,
                                              global_step=TB.TI_LOG_STEP)
 
             TB.TENSORBOARD_LOGGER.add_scalar('training/ti_mixture_nll',

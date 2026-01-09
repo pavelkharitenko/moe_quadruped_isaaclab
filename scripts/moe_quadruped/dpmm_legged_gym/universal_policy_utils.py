@@ -14,7 +14,7 @@ class MinimalReplayBuffer:
     This buffer stores trajectories as lists of dictionaries, where each
     dictionary contains observation, action, reward, next observation, and task info.
     """
-    
+
     def __init__(self, buffer):
         """
         Initialize the replay buffer.
@@ -55,7 +55,7 @@ class MinimalReplayBuffer:
         # Get dimensions
         B = len(data)  # Batch size
         T = len(data[0])  # Trajectory length
-        
+
         # Stack the trajectory data into arrays
         obs = np.stack([[step["obs"] for step in traj] for traj in data])
         act = np.stack([[step["act"] for step in traj] for traj in data])
@@ -63,7 +63,7 @@ class MinimalReplayBuffer:
         rew = np.expand_dims(rew, axis=-1)  # Add reward dimension
         next_obs = np.stack([[step["next_obs"] for step in traj] for traj in data])
         terminals = np.zeros_like(rew)  # All zeros (no terminal states)
-        
+
         # Extract task information
         true_tasks = np.array([[[{"base_task": step["task_subtype_id"]}] for step in traj] for traj in data])
 
@@ -76,7 +76,7 @@ class MinimalReplayBuffer:
             'terminals': terminals,
             'true_tasks': true_tasks,
         }
-        
+
         return (data_dict, data_dict)  # Return tuple for compatibility
 
     def make_encoder_data(self, data_dict, batch_size):
@@ -92,7 +92,7 @@ class MinimalReplayBuffer:
             Tensor of shape (batch_size, time_steps * feature_dim) for encoder input
         """
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Extract components from data dictionary
         states = torch.tensor(data_dict["observations"], dtype=torch.float32, device=device)
         actions = torch.tensor(data_dict["actions"], dtype=torch.float32, device=device)
@@ -107,14 +107,14 @@ class MinimalReplayBuffer:
 
         # Concatenate all components along the feature dimension
         sequence = torch.cat([states, actions, rewards, next_states, one_hot], dim=-1)
-        
+
         # Flatten the time and feature dimensions for encoder input
         B, T, D = sequence.shape
         sequence = sequence.reshape(B, T * D)
 
         # Verify batch size consistency
         assert B == batch_size, f"Batch size mismatch: expected {batch_size}, got {B}"
-        
+
         return sequence
 
     def get_train_val_indices(self, train_val_percent):
@@ -141,7 +141,7 @@ class LatentInjectedEnvWrapper:
     This wrapper modifies the environment's observations to include a latent
     task representation vector, allowing the policy to adapt to different tasks.
     """
-    
+
     def __init__(self, env, z_vector):
         """
         Initialize the wrapper.
@@ -180,10 +180,10 @@ class LatentInjectedEnvWrapper:
         """
         # Step the environment
         obs_buf, privileged_obs_buf, rew_buf, reset_buf, extras = self.env.step(actions)
-        
+
         # Inject latent vector into the observations
         obs_buf[:, -self.z_dim:] = self.z_vector.to(obs_buf.device)
-        
+
         # Return the modified outputs
         return obs_buf, rew_buf, reset_buf, extras
 
@@ -199,7 +199,7 @@ class TrajectoryCollector:
     This class handles the collection of trajectories for training the
     task inference model.
     """
-    
+
     def __init__(self, traj_length, buffer_size):
         """
         Initialize the trajectory collector.
@@ -228,7 +228,7 @@ class TrajectoryCollector:
         # Get initial observations
         obs = env.get_observations()
         prev_obs = obs.clone()
-        
+
         # Initialize trajectory storage
         trajs = [[] for _ in selected_envs]
 
@@ -236,15 +236,15 @@ class TrajectoryCollector:
         for _ in range(self.traj_length):
             with torch.no_grad():
                 act = policy(obs)  # Get actions from policy
-                
+
             # Step the environment
             obs, _, rews, _, _ = env.step(act)
-            
+
             # Store the transition for each selected environment
             for i, env_id in enumerate(selected_envs):
                 task_id = int(task_ids[env_id].item())
                 terrain_type = int(env.terrain_types[env_id].item())
-                
+
                 # Determine task subtype (base task or terrain-specific)
                 task_subtype = task_id if task_id < 4 else 5 + terrain_type
 
@@ -257,12 +257,12 @@ class TrajectoryCollector:
                     "task_id": task_id,
                     "task_subtype_id": task_subtype
                 })
-                
+
             prev_obs = obs.clone()  # Update previous observations
-        
+
         # Update the training buffer
         self.training_buffer = trajs
-        
+
         return trajs
 
     def prepare_encoder_input(self):
@@ -280,11 +280,11 @@ class TrajectoryCollector:
             rewards = np.stack([step["rew"] for step in traj])
             rewards = rewards.reshape(-1, 1)  # Add dimension
             next_states = np.stack([step["next_obs"][:UniversalpolicyCfg().STATE_DIM] for step in traj])
-            
+
             # Concatenate components
             seq = np.concatenate([states, actions, rewards, next_states], axis=1)
             sequences.append(seq)
-            
+
         return torch.tensor(np.stack(sequences), dtype=torch.float32)
 
 
@@ -309,13 +309,14 @@ def class_to_dict(cls):
             d[attr] = val
     return d
 
-class UniversalpolicyCfg: 
+
+class UniversalpolicyCfg:
     TRAJECTORY_LENGTH = 64
     TASKS_NUM = 9
     MAX_BUFFER_SIZE = 10000
     #just temporary
     #OBS_DIM=235
-    OBS_DIM=235
+    OBS_DIM = 235
     ACTION_DIM = 12  # robot DOF count
     REWARD_DIM = 1
     Z_DIM = 12
@@ -324,11 +325,12 @@ class UniversalpolicyCfg:
     #for dpmm
     #STATE_DIM = OBS_DIM+Z_DIM  # actual environment observation size
     #for gmm
-    STATE_DIM=247
-    max_epoch=4000
-    traj_collect_per_task=100 #how many robots' traj are collected per task per step
-    traj_collect_per_subterrain=50 #how many robots' traj arec collected for each terrain
-    init_traj_collect_per_task=800
+    STATE_DIM = 247
+    max_epoch = 4000
+    traj_collect_per_task = 100  #how many robots' traj are collected per task per step
+    traj_collect_per_subterrain = 50  #how many robots' traj arec collected for each terrain
+    init_traj_collect_per_task = 800
+
     class bnp_model:
         gamma0 = 5.0
         num_lap = 10
@@ -353,8 +355,8 @@ class UniversalpolicyCfg:
             pair_ranking_direction = 'descending'
 
     class trainer:
-        batch_size=1024
-        batch_size_rollout=256
+        batch_size = 1024
+        batch_size_rollout = 256
         lr_decoder = 3e-4
         lr_encoder = 3e-4
         alpha_kl_z = 0.0001
@@ -372,7 +374,7 @@ class UniversalpolicyCfg:
         PCGrad_option = 'true_task'
         optimizer_class = 'Adam'
         log_dir = None
-        mixture_steps=128
+        mixture_steps = 128
 
     class warmup:
         beta_final = 0.0001
@@ -381,4 +383,3 @@ class UniversalpolicyCfg:
     class ppo:
         num_learning_iterations = 1
         init_at_random_ep_len = True
-    

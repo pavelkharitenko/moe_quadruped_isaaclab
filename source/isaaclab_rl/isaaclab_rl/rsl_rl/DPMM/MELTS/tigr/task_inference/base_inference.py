@@ -4,16 +4,9 @@ import torch
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.improved_encoder import GruAttentionEncoder, ConvAttentionEncoder, TransformerModel
 
 
-
 class MLP(nn.Module):
-    def __init__(
-        self,
-        input_size,
-        hidden_sizes,
-        output_size,
-        activation=nn.ReLU,
-        output_activation=None
-    ):
+
+    def __init__(self, input_size, hidden_sizes, output_size, activation=nn.ReLU, output_activation=None):
         super().__init__()
 
         layers = []
@@ -35,8 +28,8 @@ class MLP(nn.Module):
         return self.model(x)
 
 
-
 class DecoupledEncoder(nn.Module):
+
     def __init__(self,
                  shared_dim,
                  encoder_input_dim,
@@ -46,8 +39,7 @@ class DecoupledEncoder(nn.Module):
                  encoding_mode,
                  timestep_combination,
                  encoder_type='mlp',
-                 bnp_model=None
-                 ):
+                 bnp_model=None):
         super(DecoupledEncoder, self).__init__()
         self.shared_dim = shared_dim
         self.encoder_input_dim = encoder_input_dim
@@ -70,17 +62,19 @@ class DecoupledEncoder(nn.Module):
             # TODO: Test batchnorm
             self.shared_encoder = nn.Sequential(
                 # nn.BatchNorm1d(self.encoder_input_dim),
-                self.shared_encoder
-            )
+                self.shared_encoder)
         elif encoder_type == 'gru':
             assert self.encoding_mode == 'trajectory'
-            self.shared_encoder = GruAttentionEncoder(self.encoder_input_dim, self.shared_dim, self.time_steps, self.encoding_mode)
+            self.shared_encoder = GruAttentionEncoder(self.encoder_input_dim, self.shared_dim, self.time_steps,
+                                                      self.encoding_mode)
         elif encoder_type == 'conv':
             assert self.encoding_mode == 'transitionSharedY'
-            self.shared_encoder = ConvAttentionEncoder(self.encoder_input_dim, self.shared_dim, self.time_steps, self.encoding_mode)
+            self.shared_encoder = ConvAttentionEncoder(self.encoder_input_dim, self.shared_dim, self.time_steps,
+                                                       self.encoding_mode)
         elif encoder_type == 'transformer':
             assert self.encoding_mode == 'transitionSharedY'
-            self.shared_encoder = TransformerModel(self.encoder_input_dim, self.shared_dim, self.time_steps, self.encoding_mode)
+            self.shared_encoder = TransformerModel(self.encoder_input_dim, self.shared_dim, self.time_steps,
+                                                   self.encoding_mode)
         else:
             raise NotImplementedError(f'Encoder type "{encoder_type}" is not implemented!')
 

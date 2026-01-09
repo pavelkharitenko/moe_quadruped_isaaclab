@@ -91,8 +91,8 @@ class DPMMReplayBuffer:
         probs = weights / weights.sum()
         indices = torch.multinomial(probs, batch_size, replacement=True)
 
-        print("batch_size", batch_size)
-        print("indices", indices)
+        #print("batch_size", batch_size)
+        #print("indices", indices)
 
         return indices.tolist()
 
@@ -144,7 +144,7 @@ class DPMMReplayBuffer:
         rewards = []
         next_obs = []
         terminals = []
-        true_tasks = []
+        task_ids = []
 
         for ctx in contexts:
             # Pad context from the left if needed
@@ -158,9 +158,8 @@ class DPMMReplayBuffer:
             rewards.append([c.reward.cpu().numpy() for c in ctx])
             next_obs.append([c.next_obs.cpu().numpy() for c in ctx])
             terminals.append([c.done.cpu().numpy() for c in ctx])
-
             # Match original true_task format: dict with base_task
-            true_tasks.append([[{"base_task": int(torch.argmax(c.task_id).item()), "specification": 0}] for c in ctx])
+            task_ids.append([c.task_id.cpu().numpy() for c in ctx])  # TODO remove task_id later
 
         # Convert to arrays
         e_data = dict(
@@ -169,7 +168,7 @@ class DPMMReplayBuffer:
             rewards=np.asarray(rewards, dtype=np.float32),
             next_observations=np.asarray(next_obs, dtype=np.float32),
             terminals=np.asarray(terminals, dtype=np.uint8),
-            true_tasks=np.asarray(true_tasks, dtype=object),
+            task_ids=np.asarray(task_ids, dtype=np.float32),  # TODO remove task_id later
         )
 
         # Decoder only uses the last step
@@ -191,15 +190,17 @@ class DPMMReplayBuffer:
         actions = torch.from_numpy(data["actions"]).float()
         rewards = torch.from_numpy(data["rewards"]).float()
         next_observations = torch.from_numpy(data["next_observations"]).float()
+        task_ids = torch.from_numpy(data["task_ids"]).float()  # TODO remove task_id later
 
         # Drop last timestep (same as original)
         obs_enc = observations.detach().clone()[:, :-1, :]
         act_enc = actions.detach().clone()[:, :-1, :]
         rew_enc = rewards.detach().clone()[:, :-1, :]
         next_obs_enc = next_observations.detach().clone()[:, :-1, :]
+        task_ids_enc = task_ids.detach().clone()[:, :-1, :]
 
         encoder_input = torch.cat(
-            [obs_enc, act_enc, rew_enc, next_obs_enc],
+            [obs_enc, act_enc, rew_enc, next_obs_enc, task_ids_enc],  # TODO remove task_id later
             dim=-1,
         )
 
