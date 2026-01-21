@@ -48,7 +48,8 @@ class DpmmVaeCfgBnpy:
     class bnp_model:
         gamma0 = 5.0
         num_lap = 10
-        fit_interval = "adaptive"
+        start_epoch = 0 # default
+        fit_interval = "epoch" # default is "adaptive"
 
         class birth:
             start_lap = 1
@@ -95,7 +96,7 @@ class DpmmVaeCfgBnpy:
         pcgrad_option = "true_task"
         optimizer_class = "Adam"
 
-        mixture_steps = 128
+        mixture_steps = 32
 
     # Warmup
     class warmup:

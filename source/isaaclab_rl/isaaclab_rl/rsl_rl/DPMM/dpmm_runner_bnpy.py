@@ -169,6 +169,7 @@ class DPMMRunner(OnPolicyRunner):
             save_dir=absolute_log_dir,
             gamma0=dpmm_cfg.bnp_model.gamma0,
             num_lap=dpmm_cfg.bnp_model.num_lap,
+            start_epoch=dpmm_cfg.bnp_model.start_epoch,
             fit_interval=dpmm_cfg.bnp_model.fit_interval,
             birth_kwargs=dict(
                 b_startLap=dpmm_cfg.bnp_model.birth.start_lap,
@@ -517,7 +518,10 @@ class DPMMRunner(OnPolicyRunner):
                 self.dpmm_trainer.alpha_kl_z = vae_beta
 
                 self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+
                 #exit(0)
+
+
             # === PPO update ===
             start_update = time.time()
             loss_dict = self.alg.update()
@@ -535,3 +539,7 @@ class DPMMRunner(OnPolicyRunner):
         # === Final save ===
         if self.log_dir is not None and not self.disable_logs:
             self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+
+
+
+

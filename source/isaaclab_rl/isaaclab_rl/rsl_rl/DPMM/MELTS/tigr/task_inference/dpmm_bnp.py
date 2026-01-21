@@ -6,6 +6,12 @@ from itertools import cycle
 from bnpy.data.XData import XData
 from matplotlib import pylab
 
+import numpy as np
+np.float = float
+np.int = int
+np.bool = bool
+
+
 class BNPModel:
     def __init__(self, save_dir, gamma0=5.0, start_epoch=0, num_lap=200,
                  fit_interval='epoch', kl_method='hard',
@@ -90,7 +96,8 @@ class BNPModel:
         # save best model for debugging
         cur_model, lap_val = bnpy.load_model_at_lap(self.info_dict['task_output_path'], None)
         bnpy.viz.PlotComps.plotCompsFromHModel(cur_model, Data=z)
-        pylab.savefig(os.path.join(self.save_dir, "dpmm_" + suffix + ".png"))
+        #pylab.savefig(os.path.join(self.save_dir, "dpmm_" + suffix + ".png"))
+        print("saved cluster plot to", os.path.join(self.save_dir, "dpmm_" + suffix + ".png"))
 
     def calc_cluster_component_params(self):
         self.comp_mu = [torch.Tensor(self.model.obsModel.get_mean_for_comp(i))
