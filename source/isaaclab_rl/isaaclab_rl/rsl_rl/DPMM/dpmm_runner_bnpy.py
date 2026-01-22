@@ -510,7 +510,7 @@ class DPMMRunner(OnPolicyRunner):
 
             # update VAE's KL beta
 
-            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it % 2 == 0 and it > 0:
+            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it > 0: #and it % 2 == 0
                 vae_beta = min(self.dpmm_cfg.warmup.beta_final,
                                self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
                 self.dpmm_trainer.alpha_kl_z = vae_beta

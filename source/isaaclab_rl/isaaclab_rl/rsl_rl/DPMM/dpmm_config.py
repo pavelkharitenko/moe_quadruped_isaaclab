@@ -27,7 +27,7 @@ class DpmmVaeCfgBnpy:
     num_tasks = 2
 
     # DPMM Buffer & Trajectory
-    num_envs_per_iter = 0.2  # fraction percentage of total envs to sample trajectories from
+    num_envs_per_iter = 0.6  # fraction percentage of total envs to sample trajectories from (e.g. 60/100)
     dpmm_buffer_size = 100_000
     context_length = 24
     max_traj_len = 1000
