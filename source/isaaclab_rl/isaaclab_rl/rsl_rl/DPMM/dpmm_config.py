@@ -28,10 +28,10 @@ class DpmmVaeCfgBnpy:
 
     # DPMM Buffer & Trajectory
     num_envs_per_iter = 0.2  # fraction percentage of total envs to sample trajectories from
-    dpmm_buffer_size = 50_000
+    dpmm_buffer_size = 100_000
     context_length = 24
     max_traj_len = 1000
-    batch_size = 128
+    batch_size = 256
 
     # Environment / model dims
     trajectory_length = 64
@@ -55,9 +55,9 @@ class DpmmVaeCfgBnpy:
             start_lap = 1
             stop_lap = 5
             k_fresh = 2
-            min_num_atoms_for_new_comp = 16
-            min_num_atoms_for_target_comp = 16
-            min_num_atoms_for_retain_comp = 16
+            min_num_atoms_for_new_comp = 8 # 16
+            min_num_atoms_for_target_comp = 8 # 16
+            min_num_atoms_for_retain_comp = 8 # 16
             min_perc_change_to_reactivate = 0.05
             debug_output_dir = None
             debug_write_html = 0
@@ -76,8 +76,8 @@ class DpmmVaeCfgBnpy:
         lr_decoder = 3e-4
         lr_encoder = 3e-4
 
-        alpha_kl_z = 1e-4
-        beta_euclid = 5e-4
+        alpha_kl_z = 1e-2 # 1e-4
+        beta_euclid = 0.0 #5e-4
         gamma_sparsity = 1e-3
 
         regularization_lambda = 0.1

@@ -498,12 +498,10 @@ class DPMMRunner(OnPolicyRunner):
                 print(f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)} | "
                       f"last_reward={self.dpmm_buffer.buffer[-1].reward} | "
                       f"done={self.dpmm_buffer.buffer[-1].done}")
-
                 print("dpmm total update steps", self.dpmm_total_update_steps)
-
-                done_count = sum(t.done for t in self.dpmm_buffer.buffer)
-                print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer)}")
-                print(f"DPMM done count = {done_count}")
+                #done_count = sum(t.done for t in self.dpmm_buffer.buffer)
+                #print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer)}")
+                #print(f"DPMM done count = {done_count}")
 
             # DPMM-VAE training update:
 
@@ -512,7 +510,7 @@ class DPMMRunner(OnPolicyRunner):
 
             # update VAE's KL beta
 
-            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length:
+            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it % 2 == 0 and it > 0:
                 vae_beta = min(self.dpmm_cfg.warmup.beta_final,
                                self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
                 self.dpmm_trainer.alpha_kl_z = vae_beta

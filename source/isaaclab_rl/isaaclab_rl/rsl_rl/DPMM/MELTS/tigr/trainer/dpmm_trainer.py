@@ -5,6 +5,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from jsonlines import jsonlines
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import matplotlib.cm as cm
 
 #import rlkit.torch.pytorch_util as ptu
 
@@ -87,12 +90,12 @@ class AugmentedTrainer(BaseTrainer):
             self.encoder.bnp_model.plot_clusters(z, suffix=str(current_epoch))
 
 
-        if current_epoch % 140 == 0:
+        if current_epoch % 20 == 0:
             self.online_tsne_plot(
                 indices=train_indices,
-                batch_size=self.batch_size,
-                num_batches=4,
-                max_points=1024,
+                #batch_size=self.batch_size,
+                #num_batches=4,
+                #max_points=1024,
             )
 
         return self.lowest_loss_epoch
@@ -412,98 +415,79 @@ class AugmentedTrainer(BaseTrainer):
             0.0,
         )
 
-
-    def online_tsne_plot(
-        self,
-        indices,
-        batch_size=256,
-        num_batches=4,
-        max_points=1024,
-        use_mu=True,
-        perplexity=30,
-    ):
-        """
-        Online t-SNE plot for latent task embeddings.
-        Uses the same replay buffer sampling as training.
-        Intended for debugging / monitoring.
-        """
-
-        import numpy as np
-        import matplotlib.pyplot as plt
-        from sklearn.manifold import TSNE
-        from sklearn.decomposition import PCA
+    def online_tsne_plot(self, indices, perplexity=30):
+        
 
         self.encoder.eval()
 
-        Z = []
-        TASKS = []
-        CLUSTERS = []
-
-        with torch.no_grad():
-            for _ in range(num_batches):
-                # Same sampling as training
-                e_data, d_data = self.replay_buffer.sample_random_few_step_batch(
-                    indices,
-                    batch_size,
-                    normalize=self.use_data_normalization,
-                    prio="linear",
-                )
-
-                encoder_input = self.replay_buffer.make_encoder_data(e_data, batch_size)
-
-                mu, log_var = self.encoder.encode(encoder_input)
-                z = mu if use_mu else self.encoder.sample(mu, log_var)
-
-                Z.append(z.detach().cpu().numpy())
-
-                # Extract task labels exactly like training
-                true_tasks = torch.as_tensor(
-                    d_data["task_ids"],
-                    dtype=torch.float32,
-                    device=self.device,
-                )
-                last_task_onehot = true_tasks[:, -1, :]
-                targets = torch.argmax(last_task_onehot, dim=-1)
-                TASKS.append(targets.detach().cpu().numpy())
-
-                # DPMM cluster assignments (if available)
-                if self.encoder.bnp_model.model:
-                    _, comps = self.encoder.bnp_model.cluster_assignments(z)
-                    CLUSTERS.append(np.array(comps))
-                else:
-                    CLUSTERS.append(-np.ones(z.shape[0]))
-
-        # Concatenate and cap points
-        Z = np.concatenate(Z, axis=0)[:max_points]
-        TASKS = np.concatenate(TASKS, axis=0)[:max_points]
-        CLUSTERS = np.concatenate(CLUSTERS, axis=0)[:max_points]
-
-        # Optional PCA for stability
-        if Z.shape[1] > 6:
-            Z = PCA(n_components=6).fit_transform(Z)
-
-        # t-SNE projection
-        Z_2d = TSNE(
-            n_components=2,
-            perplexity=perplexity,
-            learning_rate="auto",
-            init="random",
-            random_state=0,
-        ).fit_transform(Z)
-
-        # Plot
-        plt.figure(figsize=(6, 6))
-        plt.scatter(
-            Z_2d[:, 0],
-            Z_2d[:, 1],
-            c=CLUSTERS if self.encoder.bnp_model.model else TASKS,
-            cmap="tab20",
-            s=8,
+        # Sample batch (same as training)
+        e_data, d_data = self.replay_buffer.sample_random_few_step_batch(
+            indices,
+            self.batch_size,
+            normalize=self.use_data_normalization,
         )
-        plt.title(f"Online t-SNE (epoch {self.current_epoch})")
-        plt.xlabel("t-SNE dim 1")
-        plt.ylabel("t-SNE dim 2")
+
+        # ----- ground-truth task (LAST timestep, consistent with training)
+        true_tasks = torch.as_tensor(
+            d_data["task_ids"], device=self.device
+        )[:, -1, :]
+        gt_labels = torch.argmax(true_tasks, dim=-1).cpu().numpy()
+
+        # ----- encode
+        encoder_input = self.replay_buffer.make_encoder_data(e_data, self.batch_size)
+        with torch.no_grad():
+            mu, log_var = self.encoder.encode(encoder_input)
+            z = self.encoder.sample(mu, log_var)
+
+        # Cluster assignment → TORCH
+        if self.encoder.bnp_model.model:
+            _, cluster_ids = self.encoder.bnp_model.cluster_assignments(z)
+            cluster_ids = np.asarray(cluster_ids)
+        else:
+            cluster_ids = np.zeros(z.shape[0], dtype=int)
+
+        # t-SNE → NUMPY
+        z_np = z.detach().cpu().numpy()
+
+        z_2d = TSNE(
+            n_components=2,
+            perplexity=min(perplexity, len(z_np) - 1),
+            init="pca",
+            learning_rate="auto",
+        ).fit_transform(z_np)
+
+
+        # ----- plot
+        plt.figure(figsize=(6, 6))
+        scatter = plt.scatter(
+            z_2d[:, 0],
+            z_2d[:, 1],
+            c=cluster_ids,
+            cmap="tab10",
+            s=200,
+            alpha=0.8,
+        )
+
+        # Circle by ground-truth task
+
+        # map GT task → color
+        task_cmap = cm.get_cmap("tab10")
+        edge_colors = task_cmap(gt_labels % 10)  # RGBA array
+
+        plt.scatter(
+            z_2d[:, 0],
+            z_2d[:, 1],
+            facecolors="none",
+            edgecolors=edge_colors,
+            s=300,
+            linewidths=1.5,
+        )
+
+
+        plt.title("t-SNE: fill = DPMM cluster, edge = GT task")
+        plt.colorbar(scatter, label="DPMM cluster")
         plt.tight_layout()
         plt.show()
 
         self.encoder.train()
+
