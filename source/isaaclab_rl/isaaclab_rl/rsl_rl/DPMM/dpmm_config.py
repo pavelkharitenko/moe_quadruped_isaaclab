@@ -31,7 +31,7 @@ class DpmmVaeCfgBnpy:
     dpmm_buffer_size = 100_000
     context_length = 24
     max_traj_len = 1000
-    batch_size = 256
+    batch_size = 512 #256
 
     # Environment / model dims
     trajectory_length = 64
@@ -47,13 +47,13 @@ class DpmmVaeCfgBnpy:
     # BNP / DPMM (bnpy)
     class bnp_model:
         gamma0 = 5.0
-        num_lap = 10
+        num_lap = 20
         start_epoch = 0 # default
         fit_interval = "epoch" # default is "adaptive"
 
         class birth:
             start_lap = 1
-            stop_lap = 5
+            stop_lap = 10
             k_fresh = 2
             min_num_atoms_for_new_comp = 8 # 16
             min_num_atoms_for_target_comp = 8 # 16
@@ -63,7 +63,7 @@ class DpmmVaeCfgBnpy:
             debug_write_html = 0
 
         class merge:
-            start_lap = 5
+            start_lap = 10
             max_num_pairs_containing_comp = 50
             n_lap_to_reactivate = 2
             pair_ranking_procedure = "obsmodel_elbo"
@@ -71,13 +71,12 @@ class DpmmVaeCfgBnpy:
 
     # Training
     class trainer:
-        batch_size = 20
-        batch_size_rollout = 256
+        batch_size_rollout = 512 #256
         lr_decoder = 3e-4
         lr_encoder = 3e-4
 
-        alpha_kl_z = 1e-2 # 1e-4
-        beta_euclid = 0.0 #5e-4
+        alpha_kl_z = 1e-4
+        beta_euclid = 5e-4
         gamma_sparsity = 1e-3
 
         regularization_lambda = 0.1
@@ -96,7 +95,7 @@ class DpmmVaeCfgBnpy:
         pcgrad_option = "true_task"
         optimizer_class = "Adam"
 
-        mixture_steps = 32
+        mixture_steps = 64 #32
 
     # Warmup
     class warmup:

@@ -243,10 +243,10 @@ class DPMMRunner(OnPolicyRunner):
             num_classes=tasks_num,
             latent_dim=dpmm_cfg.z_dim,
             timesteps=dpmm_cfg.time_steps,
-            lr_encoder=3e-4,
-            lr_decoder=3e-4,
-            alpha_kl_z=1e-4,
-            beta_euclid=5e-4,
+            lr_encoder=dpmm_cfg.trainer.lr_encoder,
+            lr_decoder=dpmm_cfg.trainer.lr_decoder,
+            alpha_kl_z=dpmm_cfg.trainer.alpha_kl_z,
+            beta_euclid=dpmm_cfg.trainer.beta_euclid,
             gamma_sparsity=1e-3,
             regularization_lambda=0.1,
             use_state_diff=False,
@@ -261,7 +261,7 @@ class DPMMRunner(OnPolicyRunner):
             PCGrad_option="true_task",
             optimizer_class=torch.optim.Adam,
             device=self.device,
-            log_dir=absolute_log_dir,
+            log_dir=self.log_dir,
         )
 
         # subset of envs that contribute to dpmm buffer
@@ -510,14 +510,15 @@ class DPMMRunner(OnPolicyRunner):
 
             # update VAE's KL beta
 
-            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it > 0: #and it % 2 == 0
+            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it > 40 and it % 4 == 0:
+
                 vae_beta = min(self.dpmm_cfg.warmup.beta_final,
                                self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
                 self.dpmm_trainer.alpha_kl_z = vae_beta
 
                 self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
 
-                #exit(0)
+
 
 
             # === PPO update ===

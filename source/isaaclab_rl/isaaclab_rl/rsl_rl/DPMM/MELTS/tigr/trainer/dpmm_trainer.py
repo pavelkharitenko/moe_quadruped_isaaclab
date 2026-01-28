@@ -57,6 +57,7 @@ class AugmentedTrainer(BaseTrainer):
         self.loss_ce = nn.CrossEntropyLoss(reduction='none')
         # self.prev_reward_loss = torch.zeros(self.batch_size)
         self.current_epoch = None
+        self.recon_loss = 0
 
     def train(self, mixture_steps, w_method='val_value_based', current_epoch=0):
         self.current_epoch = current_epoch
@@ -80,6 +81,7 @@ class AugmentedTrainer(BaseTrainer):
 
             self._n_train_steps_mixture += 1
 
+        print("recon loss:", self.recon_loss)
         #logger.record_tabular('Mixture_steps', mixture_training_step + 1)
         '''
         DPMM TRAINING EPOCHS
@@ -90,13 +92,9 @@ class AugmentedTrainer(BaseTrainer):
             self.encoder.bnp_model.plot_clusters(z, suffix=str(current_epoch))
 
 
-        if current_epoch % 20 == 0:
-            self.online_tsne_plot(
-                indices=train_indices,
-                #batch_size=self.batch_size,
-                #num_batches=4,
-                #max_points=1024,
-            )
+        # Visualize t-sne plot of DPMM using samples from current buffer
+        if current_epoch % 200 == 0:
+            self.online_tsne_plot(indices=train_indices)
 
         return self.lowest_loss_epoch
 
@@ -181,6 +179,11 @@ class AugmentedTrainer(BaseTrainer):
         # self.prev_reward_loss = mixture_reward_loss
 
         mixture_nll = self.loss_weight_state * mixture_state_loss + self.loss_weight_reward * mixture_reward_loss
+
+        self.recon_loss = torch.mean(mixture_nll).detach().cpu().numpy()
+        # mean over batch
+        
+
         assert not torch.isnan(latent_variables).any(), latent_variables
         assert not torch.isnan(state_estimate).any(), state_estimate
         assert not torch.isnan(reward_estimate).any(), reward_estimate
@@ -304,6 +307,9 @@ class AugmentedTrainer(BaseTrainer):
                                              global_step=TB.TI_LOG_STEP)
             # if self.use_regularization_loss:
             #     TB.TENSORBOARD_LOGGER.add_scalar('training/ti_mixture_regularization_loss', reg_loss.mean().item(), global_step=TB.TI_LOG_STEP)
+            
+
+
         TB.TI_LOG_STEP += 1
 
         return ((torch.sum(mixture_loss) / self.batch_size), total_state_loss, total_reward_loss), latent_variables
