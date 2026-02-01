@@ -114,6 +114,37 @@ gym.register(
     },
 )
 
+
+
+# lowcrawl
+
+gym.register(
+    id="Isaac-Velocity-Lowcrawl-Unitree-Go2-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.lowcrawl_env_cfg:UnitreeGo2LowCrawlEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
+gym.register(
+    id="Isaac-Velocity-Lowcrawl-Unitree-Go2-Play-MoE-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.legstand_reworked_env_cfg:UnitreeGo2LowCrawlEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:UnitreeGo2FlatPPORunnerCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
+    },
+)
+
+
+# obsolete envs:
+
+
+
 # bipedal walking
 
 gym.register(
@@ -137,6 +168,12 @@ gym.register(
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
     },
 )
+
+
+
+
+
+
 
 # tracking goal 
 gym.register(

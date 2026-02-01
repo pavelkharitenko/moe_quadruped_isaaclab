@@ -20,7 +20,7 @@ class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
         func=legstand_feet_height_exp,
         weight=0.0,
         params={"asset_cfg": SceneEntityCfg("robot", body_names=["FL_foot", "FR_foot"]),
-                 "target_height": 0.5, "std": math.sqrt(0.25)},
+                 "target_height": 0.8, "std": math.sqrt(0.25)},
     )
     
     orientation = RewTerm(
@@ -68,7 +68,7 @@ class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
 
 
         # Add handstand-specific reward
-        self.rewards.front_feet_height.weight = 1.5
+        self.rewards.front_feet_height.weight = 2.5
         self.rewards.orientation.weight = -5.0
         self.rewards.front_air.weight = 3.0
         self.rewards.back_support.weight = 2.0

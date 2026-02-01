@@ -16,22 +16,28 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def lowcrawl_base_height_exp(
+
+def lowcrawl_base_height_signed(
     env: "ManagerBasedRLEnv",
-    std: float,
     target_height: float,
+    tolerance: float,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """
-    Reward that exponentially prefers the base (torso) to be close to `target_height`.
-    Use this to push the robot to a low-profile posture.
+    Signed, bounded reward for base height.
+    +1 at target height
+    0 at ±tolerance
+    -1 beyond tolerance
     """
     asset: RigidObject = env.scene[asset_cfg.name]
-    # base index assumed to be asset_cfg.body_ids (should contain base); supports batching
-    base_height = asset.data.body_pos_w[:, asset_cfg.body_ids, 2]  # shape (B, n_bodies)
-    # if multiple bodies selected, we sum squared error across them (usually one)
-    height_error = torch.sum(torch.square(base_height - target_height), dim=1)
-    return torch.exp(-height_error / (std**2))
+    base_height = asset.data.body_pos_w[:, asset_cfg.body_ids, 2].mean(dim=1)
+
+    error = base_height - target_height
+    scaled = error / tolerance
+
+    # linear ramp, clipped
+    reward = 1.0 - torch.abs(scaled)
+    return torch.clamp(reward, min=-1.0, max=1.0)
 
 
 def lowcrawl_feet_clearance_penalty(
@@ -94,16 +100,25 @@ def lowcrawl_feet_last_air_time_reward(
     return reward
 
 
-def lowcrawl_crawl_posture_orientation_l2(
+def lowcrawl_orientation_signed(
     env: "ManagerBasedRLEnv",
-    target_gravity: list[float],
+    max_tilt_rad: float,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """
-    Penalize deviation of the base-frame projected gravity vector from a provided `target_gravity`.
-    For a low crawl you may want the robot to keep a roughly horizontal torso (e.g. [0, 0, 1] or small tilt),
-    but this term can also be used to discourage large roll/pitch.
+    Penalize roll/pitch deviation.
+    +1 when flat
+    0 at max_tilt
+    -1 when worse than max_tilt
     """
     asset: RigidObject = env.scene[asset_cfg.name]
-    target = torch.tensor(target_gravity, device=env.device)
-    return torch.sum(torch.square(asset.data.projected_gravity_b - target), dim=1)
+
+    # projected gravity in base frame
+    g = asset.data.projected_gravity_b
+
+    # roll/pitch magnitude ≈ xy gravity components
+    tilt_mag = torch.linalg.norm(g[:, :2], dim=1)
+
+    scaled = tilt_mag / max_tilt_rad
+    reward = 1.0 - scaled
+    return torch.clamp(reward, min=-1.0, max=1.0)
