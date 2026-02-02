@@ -60,6 +60,32 @@ def lowcrawl_feet_clearance_penalty(
     return torch.exp(-feet_error / (std**2))
 
 
+def lowcrawl_feet_clearance_signed_one_sided(
+    env: "ManagerBasedRLEnv",
+    target_height: float,
+    tolerance: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """
+    Signed, bounded reward for feet clearance (one-sided).
+    +1 when feet are at or below target height
+    0 when feet are tolerance above target
+    -1 when feet are far above target
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    feet_height = asset.data.body_pos_w[:, asset_cfg.body_ids, 2]
+
+    mean_feet_height = feet_height.mean(dim=1)
+
+    # only penalize lifting
+    error = torch.clamp(mean_feet_height - target_height, min=0.0)
+    scaled = error / tolerance
+
+    reward = 1.0 - scaled
+    return torch.clamp(reward, min=-1.0, max=1.0)
+
+
+
 def lowcrawl_feet_contact_fraction(
     env: "ManagerBasedRLEnv",
     sensor_cfg: SceneEntityCfg,

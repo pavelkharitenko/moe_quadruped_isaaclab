@@ -20,8 +20,8 @@ class UnitreeGo2LowCrawlRewardsCfg(RewardsCfg):
         weight=0.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=["base"]),
-            "target_height": 0.18,
-            "tolerance": 0.15,
+            "target_height": 0.20,
+            "tolerance": 0.1,
         },
     )
 
@@ -35,15 +35,15 @@ class UnitreeGo2LowCrawlRewardsCfg(RewardsCfg):
 
 
     feet_clearance = RewTerm(
-        func=lowcrawl_feet_clearance_penalty,
+        func=lowcrawl_feet_clearance_signed_one_sided,
         weight=0.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
                 body_names=["FL_foot", "FR_foot", "RL_foot", "RR_foot"],
             ),
-            "target_height": 0.06,
-            "std": math.sqrt(0.0025),
+            "target_height": 0.18,
+            "tolerance": 0.1,
         },
     )
 
@@ -87,25 +87,24 @@ class UnitreeGo2LowCrawlEnvCfg(UnitreeGo2FlatEnvCfg):
 
 
         # disable incompatible rewards
-        self.rewards.feet_air_time.weight = 0.0  # default hopping reward
+        self.rewards.feet_air_time.weight = 0.25  # default hopping reward
         self.rewards.flat_orientation_l2.weight = 0.0
 
         # disable reset on base touching the ground
         #self.terminations.base_contact = None
 
         # velocity tracking
-        self.rewards.track_lin_vel_xy_exp.weight = 1.5
+        self.rewards.track_lin_vel_xy_exp.weight = 2.0
         self.rewards.track_ang_vel_z_exp.weight = 1.0
 
         self.rewards.lin_vel_z_l2.weight = -2.0
         self.rewards.ang_vel_xy_l2.weight = -0.5
 
         # low-crawl specific shaping
-        self.rewards.base_height.weight = 0.5
-        self.rewards.feet_clearance.weight = 0.4
-        self.rewards.feet_contact_fraction.weight = 1.0
-        self.rewards.feet_air_time.weight = 0.5
-        self.rewards.posture_orientation.weight = 0.5
+        self.rewards.base_height.weight = 0.4
+        self.rewards.feet_clearance.weight = 0.2
+        self.rewards.feet_contact_fraction.weight = 0.1 #1.0
+        self.rewards.posture_orientation.weight = 0.25
 
 
         # terrain & observations
@@ -115,6 +114,11 @@ class UnitreeGo2LowCrawlEnvCfg(UnitreeGo2FlatEnvCfg):
         self.scene.height_scanner = None
         self.observations.policy.height_scan = None
         self.curriculum.terrain_levels = None
+
+        # terminations
+        self.terminations.base_contact.params["sensor_cfg"].body_names = ["Head_lower", "Head_upper", "base"]
+
+
 
 
 class UnitreeGo2LowCrawlEnvCfg_PLAY(UnitreeGo2LowCrawlEnvCfg):
