@@ -167,7 +167,7 @@ C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\s
 Run MT4-Env via 
 
 ```
-python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=1024 --max_iterations=2500  --run_name=run_multitask_exp_ppo --headless --seed 52
+python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=1024 --max_iterations=2500  --run_name=run_multitask_exp_ppo --headless --append_task_id
 ```
 
 Run diagnostics

@@ -29,7 +29,7 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
         # general settings for all tasks
         self.sim.dt = 0.005
         self.decimation = 4
-        self.num_multi_task_envs = 2
+        self.num_multi_task_envs = 4
         self.task_spacing = 20.0
         self.num_envs_per_task = 128
         self.envs_spacing = 2.5
