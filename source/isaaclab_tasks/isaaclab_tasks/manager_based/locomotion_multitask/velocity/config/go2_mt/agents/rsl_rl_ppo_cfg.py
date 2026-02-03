@@ -16,7 +16,7 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     experiment_name = "unitree_go2_rough"
     empirical_normalization = False
     init_at_random_ep_len = True  # if supported for MT environments (yes supported)
-    append_task_id = False # set via cli args, e.g. --append_task_id, so MT environment also respects this option
+    append_task_id = False  # set via cli args, e.g. --append_task_id, so MT environment also respects this option
 
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
@@ -39,13 +39,14 @@ class UnitreeGo2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+
 @configclass
 class UnitreeGo2FlatPPORunnerCfg(UnitreeGo2RoughPPORunnerCfg):
+
     def __post_init__(self):
         super().__post_init__()
 
         self.max_iterations = 300
-        self.experiment_name = "unitree_go2_flat"
-        self.policy.actor_hidden_dims = [128, 128, 128]
-        self.policy.critic_hidden_dims = [128, 128, 128]
-
+        self.experiment_name = "unitree_go2_multitask"
+        self.policy.actor_hidden_dims = [512, 256, 128]
+        self.policy.critic_hidden_dims = [512, 256, 128]

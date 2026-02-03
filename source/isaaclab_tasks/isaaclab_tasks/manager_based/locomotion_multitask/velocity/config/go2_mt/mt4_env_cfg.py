@@ -8,9 +8,9 @@ from isaaclab.utils import configclass
 
 # import single task envs
 from .flat_env_cfg import UnitreeGo2FlatEnvCfg
-from .rough_env_cfg import UnitreeGo2RoughEnvCfg
 from .legstand_env_cfg import UnitreeGo2LegStandEnvCfg
 from .handstand_env_cfg import UnitreeGo2HandStandEnvCfg
+from .lowcrawl_env_cfg import UnitreeGo2LowCrawlEnvCfg
 
 
 @configclass
@@ -21,10 +21,8 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
 
     flatVel: TaskConfigs = UnitreeGo2FlatEnvCfg()
     handstand: TaskConfigs = UnitreeGo2HandStandEnvCfg()
-    #flatVel2: TaskConfigs = UnitreeGo2FlatEnvCfg()
-
-    #legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
-    #legStand2: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    legStand: TaskConfigs = UnitreeGo2LegStandEnvCfg()
+    lowcrawl: TaskConfigs = UnitreeGo2LowCrawlEnvCfg()
 
     def __post_init__(self):
         """Post initialization."""
@@ -40,16 +38,15 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
 
         self.sim.render_interval = self.decimation
         self.episode_length_s = 20.0
+
         # simulation settings
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
+
         # update sensor update periods
-
-        # TODO from singletask LocomotionVelocityRoughEnvCfg add post_init settings here (to task RoughEnv)
-
-        # scale down the terrains because the robot is small
-
         self.flatSceneInits(self.flatVel.scene)
         self.flatSceneInits(self.handstand.scene)
+        self.flatSceneInits(self.legStand.scene)
+        self.flatSceneInits(self.lowcrawl.scene)
 
     def flatSceneInits(self, scene):
         """No need in flatScene
@@ -59,12 +56,12 @@ class MTLocomotionEnvCfg(ManagerBasedMTRLEnvCfg):
 
         if scene.contact_forces is not None:
             scene.contact_forces.update_period = self.sim.dt
-        """No need in flatScene
+        """No need for flat terrain envs
         scene.world_terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
         scene.world_terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
         scene.world_terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
         """
-        """No need in flatScene
+        """No need for flat terrain envs
         # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
         # this generates terrains with increasing difficulty and is useful for training
         if getattr(self.curriculum, "terrain_levels", None) is not None:

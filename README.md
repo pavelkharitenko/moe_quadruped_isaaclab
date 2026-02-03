@@ -162,7 +162,13 @@ C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\s
 ```
 
 
+### Run Multitasks Envs
 
+Run MT4-Env via 
+
+```
+python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=1024 --max_iterations=2500  --run_name=run_multitask_exp_ppo --headless --seed 52
+```
 
 Run diagnostics
 
@@ -173,41 +179,56 @@ C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe .\scripts\moe_quadruped\p
 
 ### Remote (Ubuntu)
 
-Train Flat Task
+Run singe task training using the train_single_ppo or train_single_moe scripts with the commands as follows
+
+Run Flat Velocity Tracking Task training:
 
 ```
-python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=flat_go2_single --run_name=run16 --headless
+python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=flat_go2_single --run_name=run_flatveltracking --headless
 ```
 
-Train Flat Task with MoE:
+Run Handstand Task training:
+
+´´´
+python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-Flat-HandStand-Unitree-Go2-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=handstand_go2_st --run_name=run_handstand --headless 
+´´´
+
+Run Legstand Task training:
+
+´´´
+python scripts/moe_quadruped/train_single_ppo.py --task=Velocity-LegStand-Unitree-Go2-MoE-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=legstand_go2_st --run_name=run_legstand --headless
+´´´
+
+Run Crawl Task:
 
 ```
-C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe scripts/moe_quadruped/train_single_moe.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=5 --experiment_name=flat_go2_single_moe --run_name=run35_single_moe --headless 
+python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-Lowcrawl-Unitree-Go2-MoE-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=lowcrawl_go2_st --run_name=run_lowcrawl --headless
 ```
 
 
-Train Legstand Task
 
-```
-python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-LegStand-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=legstand_go2_single --run_name=run18_legstand --headless
-```
-
-Train Terrain Task
-
-```
-python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Rough-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=3000 --experiment_name=terrain_go2_single --run_name=run19_terrain --headless
-```
-
-
-Train Bipedal Task
-
-```
-python scripts/moe_quadruped/train_moe.py --task=Isaac-Bipedal-Unitree-Go2-MoE-v0  --num_envs=4096  --max_iterations=2000 --experiment_name=bipedal_go2_st --run_name=run31_st_bipedal --headless
-```
 
 ## Multitask Environment
 
-Original author: https://github.com/meenalparakh/MT-IsaacLab
+Code based on original author of MT-IsaacLab https://github.com/meenalparakh/MT-IsaacLab
+
+### Add new tasks:
+
+1. Create singletask EnvCfg class in `moe_quadruped_isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/`
+
+2. If everything works fine in singletask, add your EnvCfg class to `source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/`
+
+3. Your EnvCfg added in `go2_mt` must subclass a MT-Env, e.g. `go2_mt.flat_env_cfg.UnitreeGo2FlatEnvCfg` class. RewardsCfg can still be imported from your single task, no need to write again.
+
+4. Add your EnvCfg task as an attribute to `go2_mt/mt4_env_cfg.py` as `myEnvTask: TaskConfigs = UnitreeGo2MyEnvCfg()`
+
+
+
+
+
+
+## MT4 was created by:
+
 
 1. Create in source/isaaclab/envs/ two files, `manager_based_mt_rl_env(_cfg).py`, export their classes in `__init__.py`
 

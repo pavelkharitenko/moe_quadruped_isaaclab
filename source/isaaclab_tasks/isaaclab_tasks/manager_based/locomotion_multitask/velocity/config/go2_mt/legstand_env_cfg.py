@@ -4,51 +4,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from isaaclab.utils import configclass
-from isaaclab.managers import SceneEntityCfg
-from .legstand_rewards import *
-from isaaclab.managers import RewardTermCfg as RewTerm
 import math
 
-from .flat_env_cfg import UnitreeGo2FlatEnvCfg
-from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import RewardsCfg
-
-
-@configclass
-class UnitreeGo2LegStandRewardsCfg(RewardsCfg):
-
-    front_feet_height = RewTerm(
-        func=legstand_feet_height_exp,
-        weight=0.0,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["FL_foot", "FR_foot"]),
-            "target_height": 0.5,
-            "std": math.sqrt(0.25)
-        },
-    )
-
-    orientation = RewTerm(
-        func=legstand_orientation_l2,
-        weight=0.0,
-        params={"target_gravity": [-1.0, 0.0, 0.0]},  # adjust depending on base-up direction
-    )
-
-    front_air = RewTerm(
-        func=legstand_front_feet_air,
-        weight=0.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["FL_foot", "FR_foot"])},
-    )
-
-    back_support = RewTerm(
-        func=legstand_back_feet_support,
-        weight=0.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["RL_foot", "RR_foot"])},
-    )
-
-    base_penalty = RewTerm(
-        func=legstand_base_contact_penalty,
-        weight=0.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base"])},
-    )
+from .flat_env_cfg import UnitreeGo2FlatEnvCfg  # import MT FlatEnv Config to subclass
+from isaaclab_tasks.manager_based.locomotion.velocity.config.go2_moe.legstand_env_cfg import UnitreeGo2LegStandRewardsCfg  # import rewards of original singletask legstand
 
 
 @configclass
@@ -61,7 +20,7 @@ class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
         # post init of parent
         super().__post_init__()
 
-        # override rewards
+        # override rewards, no vel. tracking in legstand
         self.rewards.flat_orientation_l2.weight = 0.0
         self.rewards.feet_air_time.weight = 0.0
 
@@ -70,26 +29,16 @@ class UnitreeGo2LegStandEnvCfg(UnitreeGo2FlatEnvCfg):
         self.rewards.lin_vel_z_l2.weight = 0.0
         self.rewards.ang_vel_xy_l2.weight = 0.0
 
-        # Add handstand-specific reward
-        self.rewards.front_feet_height.weight = 1.5
-        self.rewards.orientation.weight = -5.0
-        self.rewards.front_air.weight = 3.0
-        self.rewards.back_support.weight = 2.0
-        self.rewards.base_penalty.weight = 5.0
+        # legstand-specific reward
+        self.rewards.front_feet_height.weight = 1.25
+        self.rewards.orientation.weight = -2.5
+        self.rewards.front_air.weight = 1.5
+        self.rewards.back_support.weight = 1.0
+        self.rewards.base_penalty.weight = 2.5
 
         #self.rewards.feet_air_time.weight = 5.0
-
-        # change terrain to flat
-        #self.scene.terrain.terrain_type = "plane"
-        #self.scene.terrain.terrain_generator = None
-
-        self.scene.world_terrain.terrain_type = "plane"
-        self.scene.world_terrain.terrain_generator = None
-        # no height scan
-        self.scene.height_scanner = None
-        self.observations.policy.height_scan = None
-        # no terrain curriculum
-        self.curriculum.terrain_levels = None
+        self.terminations.base_contact.params["sensor_cfg"].body_names = "base"
+        self.terminations.base_contact.time_out = True
 
 
 class UnitreeGo2LegStandEnvCfg_PLAY(UnitreeGo2LegStandEnvCfg):
