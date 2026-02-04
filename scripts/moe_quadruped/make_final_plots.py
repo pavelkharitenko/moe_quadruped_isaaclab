@@ -22,9 +22,9 @@ experiments = {
     r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_15-38-34_run_legstand_final_12",
     ],
     "Task 4: Crawl": [
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_07-10-54_run_flatvel_final_53",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-04-53_run_flatvel_final_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-44-56_run_flatvel_final_12",
+    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_16-59-34_run_lowcrawl_final_52",
+    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_17-58-21_run_lowcrawl_final_449",
+    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_18-59-17_run_lowcrawl_final_12",
     ],
 }
 
