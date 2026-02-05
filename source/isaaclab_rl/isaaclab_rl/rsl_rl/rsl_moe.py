@@ -7,7 +7,7 @@ import time
 import statistics
 import pandas as pd
 import csv
-
+import numpy as np
 from torch.distributions import Normal
 
 import rsl_rl
@@ -46,7 +46,7 @@ class MoEActorCritic(ActorCritic):
         num_actions,
         num_experts=4,
         gating_hidden_dims=[128, 128],
-        actor_hidden_dims=[256, 256],
+        actor_hidden_dims=[256, 128, 64],
         critic_hidden_dims=[256, 256],
         activation="elu",
         init_noise_std=1.0,
@@ -312,171 +312,275 @@ class MyOnPolicyRunner(OnPolicyRunner):
                         self.current_learning_iteration,
                     )
 
-    def learn1(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
-        """Extended learn() with full diagnostics for PPO buffer and reward statistics."""
-
-        # === Initialize logger ===
-        if self.log_dir is not None and self.writer is None and not self.disable_logs:
-            self.logger_type = self.cfg.get("logger", "tensorboard").lower()
-            if self.logger_type == "neptune":
-                from rsl_rl.utils.neptune_utils import NeptuneSummaryWriter
-                self.writer = NeptuneSummaryWriter(log_dir=self.log_dir, flush_secs=10, cfg=self.cfg)
-                self.writer.log_config(self.env.cfg, self.cfg, self.alg_cfg, self.policy_cfg)
-            elif self.logger_type == "wandb":
-                from rsl_rl.utils.wandb_utils import WandbSummaryWriter
-                self.writer = WandbSummaryWriter(log_dir=self.log_dir, flush_secs=10, cfg=self.cfg)
-                self.writer.log_config(self.env.cfg, self.cfg, self.alg_cfg, self.policy_cfg)
-            elif self.logger_type == "tensorboard":
-                from torch.utils.tensorboard import SummaryWriter
-                self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
-            else:
-                raise ValueError("Logger type not found. Choose 'neptune', 'wandb' or 'tensorboard'.")
-
-        # === Sanity print ===
-        print(f"\n--- PPO Learn Initialization ---")
-        print(f"Device: {self.device}")
-        print(f"num_envs: {self.env.num_envs}, num_steps_per_env: {self.num_steps_per_env}")
-        print(f"Total rollout batch size: {self.env.num_envs * self.num_steps_per_env}")
-        if hasattr(self.alg, "storage"):
-            try:
-                obs_shape = getattr(self.alg.storage, "observations", torch.empty(0)).shape
-                print(f"Storage observations shape: {obs_shape}")
-            except Exception as e:
-                print(f"(Could not access storage shape: {e})")
-        print(f"num_learning_epochs: {getattr(self.alg, 'num_learning_epochs', 'N/A')}")
-        print(f"num_mini_batches: {getattr(self.alg, 'num_mini_batches', 'N/A')}")
-        print(f"---------------------------------\n")
-
-        # === Randomize episode starts (optional) ===
-        if init_at_random_ep_len:
-            self.env.episode_length_buf = torch.randint_like(
-                self.env.episode_length_buf, high=int(self.env.max_episode_length)
-            )
-
-        # === Get initial observations ===
-        obs, extras = self.env.get_observations()
-        privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
-        obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
-        self.train_mode()
-
-        # === Initialize buffers ===
-        ep_infos = []
-        rewbuffer, lenbuffer = deque(maxlen=100), deque(maxlen=100)
-        cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
-        cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
-
-        # === CSV setup ===
-        csv_path = os.path.join(self.log_dir, "training_diagnostics.csv")
-        write_header = not os.path.exists(csv_path)
-
-        # === Training loop ===
-        start_iter = self.current_learning_iteration
-        tot_iter = start_iter + num_learning_iterations
-        for it in range(start_iter, tot_iter):
-            start_time = time.time()
-
-            # === Collect rollouts ===
-            with torch.inference_mode():
-                for _ in range(self.num_steps_per_env):
-                    actions = self.alg.act(obs, privileged_obs)
-                    obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
-                    obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-
-
-                    
-                    # Reward statistics
-                    #if it < 5 or it % 10 == 0:
-                    #    print(f"[it {it}] reward mean={rewards.mean():.4f}, std={rewards.std():.4f}, "
-                    #        f"min={rewards.min():.3f}, max={rewards.max():.3f}")
-
-                    obs = self.obs_normalizer(obs)
-                    privileged_obs = (self.privileged_obs_normalizer(
-                        infos["observations"][self.privileged_obs_type].to(self.device)
-                    ) if self.privileged_obs_type is not None else obs)
-
-                    # Store step
-                    self.alg.process_env_step(rewards, dones, infos)
-
-                    # Reward aggregation
-                    cur_reward_sum += rewards
-                    cur_episode_length += 1
-                    done_ids = (dones > 0).nonzero(as_tuple=False)
-                    if len(done_ids) > 0:
-                        rewbuffer.extend(cur_reward_sum[done_ids][:, 0].cpu().numpy().tolist())
-                        lenbuffer.extend(cur_episode_length[done_ids][:, 0].cpu().numpy().tolist())
-                        cur_reward_sum[done_ids] = 0
-                        cur_episode_length[done_ids] = 0
-
-                collection_time = time.time() - start_time
-
-                # Compute returns
-                if self.training_type == "rl":
-                    self.alg.compute_returns(privileged_obs)
-
-            # === PPO update ===
-            start_update = time.time()
-            loss_dict = self.alg.update()
-            learn_time = time.time() - start_update
-            self.current_learning_iteration = it
-
-            # === Diagnostics: PPO internals ===
-            if hasattr(self.alg, "storage"):
-                adv = getattr(self.alg.storage, "advantages", None)
-                if adv is not None:
-                    print(f"[it {it}] Advantage mean={adv.mean():.4f}, std={adv.std():.4f}, "
-                        f"min={adv.min():.3f}, max={adv.max():.3f}")
-                values = getattr(self.alg.storage, "values", None)
-                if values is not None:
-                    print(f"[it {it}] Value mean={values.mean():.4f}, std={values.std():.4f}")
-
-            # === Prepare metrics ===
-            def safe(x):
-                return x.item() if torch.is_tensor(x) else float(x)
-
-            metrics = {
-                "iteration": it,
-                "num_envs": self.env.num_envs,
-                "steps_per_env": self.num_steps_per_env,
-                "collection_time": collection_time,
-                "learn_time": learn_time,
-                "entropy": safe(loss_dict.get("entropy", float("nan"))),
-                "policy_loss": safe(loss_dict.get("surrogate", float("nan"))),
-                "value_loss": safe(loss_dict.get("value_function", float("nan"))),
-                "learning_rate": safe(getattr(self.alg.optimizer.param_groups[0], "lr", float("nan"))),
-                "mean_reward": statistics.mean(rewbuffer) if len(rewbuffer) > 0 else float("nan"),
-                "mean_ep_len": statistics.mean(lenbuffer) if len(lenbuffer) > 0 else float("nan"),
-            }
-
-            # === Write metrics to CSV ===
-            if self.log_dir is not None and not self.disable_logs:
-                write_header = not os.path.exists(csv_path)
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(metrics.keys()))
-                    if write_header:
-                        writer.writeheader()
-                    writer.writerow(metrics)
-
-                # log to tensorboard or other
-                self.log(locals())
-
-            # === Print periodic buffer sanity check ===
-            if it % 20 == 0:
-                total_expected = self.env.num_envs * self.num_steps_per_env
-                if hasattr(self.alg.storage, "observations"):
-                    obs_buf = self.alg.storage.observations
-                    print(f"[it {it}] storage.obs shape={tuple(obs_buf.shape)}, expected batch={total_expected}")
-                print(f"[it {it}] mean reward buffer={metrics['mean_reward']:.3f}, mean value_loss={metrics['value_loss']:.3f}")
-
-            # === Save model occasionally ===
-            if it % self.save_interval == 0:
-                self.save(os.path.join(self.log_dir, f"model_{it}.pt"))
-
-        # === Final save ===
-        if self.log_dir is not None and not self.disable_logs:
-            self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+    
 
 
     def _log_to_console(self, name: str, value: float, width: int, pad: int):
         print(f"{name:<{pad}} | {value:>{width - pad - 3}.3f}")
 
 
+
+    def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):  # noqa: C901
+        # initialize writer
+        if self.log_dir is not None and self.writer is None and not self.disable_logs:
+            # Launch either Tensorboard or Neptune & Tensorboard summary writer(s), default: Tensorboard.
+            self.logger_type = self.cfg.get("logger", "tensorboard")
+            self.logger_type = self.logger_type.lower()
+
+            if self.logger_type == "neptune":
+                from rsl_rl.utils.neptune_utils import NeptuneSummaryWriter
+
+                self.writer = NeptuneSummaryWriter(log_dir=self.log_dir, flush_secs=10, cfg=self.cfg)
+                self.writer.log_config(self.env.cfg, self.cfg, self.alg_cfg, self.policy_cfg)
+            elif self.logger_type == "wandb":
+                from rsl_rl.utils.wandb_utils import WandbSummaryWriter
+
+                self.writer = WandbSummaryWriter(log_dir=self.log_dir, flush_secs=10, cfg=self.cfg)
+                self.writer.log_config(self.env.cfg, self.cfg, self.alg_cfg, self.policy_cfg)
+            elif self.logger_type == "tensorboard":
+                from torch.utils.tensorboard import SummaryWriter
+
+                self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+            else:
+                raise ValueError("Logger type not found. Please choose 'neptune', 'wandb' or 'tensorboard'.")
+
+        # check if teacher is loaded
+        if self.training_type == "distillation" and not self.alg.policy.loaded_teacher:
+            raise ValueError("Teacher model parameters not loaded. Please load a teacher model to distill.")
+
+        # randomize initial episode lengths (for exploration)
+        if init_at_random_ep_len:
+            self.env.episode_length_buf = torch.randint_like(
+                self.env.episode_length_buf, high=int(self.env.max_episode_length)
+            )
+
+        
+
+        # start learning
+        obs, extras = self.env.get_observations()
+        privileged_obs = extras["observations"].get(self.privileged_obs_type, obs)
+        obs, privileged_obs = obs.to(self.device), privileged_obs.to(self.device)
+        self.train_mode()  # switch to train mode (for dropout for example)
+
+        # Book keeping
+        ep_infos = []
+        rewbuffer = deque(maxlen=100)
+        lenbuffer = deque(maxlen=100)
+        cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+
+        # create buffers for logging extrinsic and intrinsic rewards
+        if self.alg.rnd:
+            erewbuffer = deque(maxlen=100)
+            irewbuffer = deque(maxlen=100)
+            cur_ereward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+            cur_ireward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+
+        # Ensure all parameters are in-synced
+        if self.is_distributed:
+            print(f"Synchronizing parameters for rank {self.gpu_global_rank}...")
+            self.alg.broadcast_parameters()
+            # TODO: Do we need to synchronize empirical normalizers?
+            #   Right now: No, because they all should converge to the same values "asymptotically".
+
+        # Start training
+        start_iter = self.current_learning_iteration
+        tot_iter = start_iter + num_learning_iterations
+        for it in range(start_iter, tot_iter):
+            start = time.time()
+            # Rollout
+            with torch.inference_mode():
+                for _ in range(self.num_steps_per_env):
+                    # Sample actions
+                    actions = self.alg.act(obs, privileged_obs)
+                    # Step the environment
+                    obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
+                    # Move to device
+                    obs, rewards, dones = (obs.to(self.device), rewards.to(self.device), dones.to(self.device))
+                    # perform normalization
+                    obs = self.obs_normalizer(obs)
+                    if self.privileged_obs_type is not None:
+                        privileged_obs = self.privileged_obs_normalizer(
+                            infos["observations"][self.privileged_obs_type].to(self.device)
+                        )
+                    else:
+                        privileged_obs = obs
+
+                    # process the step
+                    self.alg.process_env_step(rewards, dones, infos)
+
+                    # Extract intrinsic rewards (only for logging)
+                    intrinsic_rewards = self.alg.intrinsic_rewards if self.alg.rnd else None
+
+                    # book keeping
+                    if self.log_dir is not None:
+                        if "episode" in infos:
+                            ep_infos.append(infos["episode"])
+                        elif "log" in infos:
+                            ep_infos.append(infos["log"])
+                        # Update rewards
+                        if self.alg.rnd:
+                            cur_ereward_sum += rewards
+                            cur_ireward_sum += intrinsic_rewards  # type: ignore
+                            cur_reward_sum += rewards + intrinsic_rewards
+                        else:
+                            cur_reward_sum += rewards
+                        # Update episode length
+                        cur_episode_length += 1
+                        # Clear data for completed episodes
+                        # -- common
+                        new_ids = (dones > 0).nonzero(as_tuple=False)
+                        rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                        lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
+                        cur_reward_sum[new_ids] = 0
+                        cur_episode_length[new_ids] = 0
+                        # -- intrinsic and extrinsic rewards
+                        if self.alg.rnd:
+                            erewbuffer.extend(cur_ereward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                            irewbuffer.extend(cur_ireward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                            cur_ereward_sum[new_ids] = 0
+                            cur_ireward_sum[new_ids] = 0
+
+                stop = time.time()
+                collection_time = stop - start
+                start = stop
+
+                # compute returns
+                if self.training_type == "rl":
+                    self.alg.compute_returns(privileged_obs)
+
+            # update policy
+            loss_dict = self.alg.update()
+
+            stop = time.time()
+            learn_time = stop - start
+            self.current_learning_iteration = it
+
+            self._log_moe_diagnostics(obs)
+
+
+            # log info
+            if self.log_dir is not None and not self.disable_logs:
+                # Log information
+                self.log(locals())
+                # Save model
+                if it % self.save_interval == 0:
+                    self.save(os.path.join(self.log_dir, f"model_{it}.pt"))
+
+            # Clear episode infos
+            ep_infos.clear()
+            # Save code state
+            if it == start_iter and not self.disable_logs:
+                # obtain all the diff files
+                git_file_paths = store_code_state(self.log_dir, self.git_status_repos)
+                # if possible store them to wandb
+                if self.logger_type in ["wandb", "neptune"] and git_file_paths:
+                    for path in git_file_paths:
+                        self.writer.save_file(path)
+
+        # Save the final model after training
+        if self.log_dir is not None and not self.disable_logs:
+            self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+
+
+    def _log_moe_diagnostics(self, obs: torch.Tensor, num_tasks=4):
+        """
+        Logging function for MoE statistics, if not running MoE, can be ignored or removed
+        
+        :param self: Description
+        :param obs: Description
+        :type obs: torch.Tensor
+        :param num_tasks: provide for logging the true task number
+        """
+
+        if self.current_learning_iteration % 20 != 0:
+            return  # skip logging for other iterations
+
+
+        policy = self.alg.policy
+
+        if not hasattr(policy, "num_experts"):
+            return
+
+        if self.writer is None:
+            return
+
+        # Create storage directory for raw gating weights
+        weights_dir = os.path.join(self.log_dir, "gating_weights")
+        os.makedirs(weights_dir, exist_ok=True)
+
+        with torch.no_grad():
+            # subsample for speed + stability
+            obs = obs[: min(2048, obs.shape[0])]
+
+            # ---- gating ----
+            gating_logits = policy.gating_network(obs)
+            gating_weights = torch.softmax(gating_logits, dim=-1)  # [B, E]
+
+            # ---- global expert usage ----
+            mean_weights = gating_weights.mean(dim=0)
+            for i, w in enumerate(mean_weights):
+                self.writer.add_scalar(
+                    f"MoE/global/expert_{i}",
+                    w.item(),
+                    self.current_learning_iteration,
+                )
+
+            # ---- entropy ----
+            entropy = -(gating_weights * torch.log(gating_weights + 1e-8)).sum(dim=-1)
+            self.writer.add_scalar(
+                "MoE/global/entropy",
+                entropy.mean().item(),
+                self.current_learning_iteration,
+            )
+
+            # ---- histograms ----
+            for i in range(policy.num_experts):
+                self.writer.add_histogram(
+                    f"MoE/global/weights_hist/expert_{i}",
+                    gating_weights[:, i],
+                    self.current_learning_iteration,
+                )
+
+            # =====================================================
+            # Task-conditioned gating (from one-hot in observation)
+            # =====================================================
+            task_one_hot = obs[:, -num_tasks:]
+            task_ids = torch.argmax(task_one_hot, dim=-1)
+
+            for t in torch.unique(task_ids):
+                mask = task_ids == t
+                if mask.sum() < 10:
+                    continue  # avoid noise
+
+                task_mean = gating_weights[mask].mean(dim=0)
+                for i, w in enumerate(task_mean):
+                    self.writer.add_scalar(
+                        f"MoE/task_{int(t)}/expert_{i}",
+                        w.item(),
+                        self.current_learning_iteration,
+                    )
+
+                # optional: histogram to see distribution of expert usage for this task
+                for i in range(policy.num_experts):
+                    self.writer.add_histogram(
+                        f"MoE/task_{int(t)}/weights_hist/expert_{i}",
+                        gating_weights[mask, i],
+                        self.current_learning_iteration,
+                    )
+
+                # ----- NEW: store raw gating weights for offline plotting -----
+                # filename: task_{t}_iter_{iteration}.npz
+                np.savez(
+                    os.path.join(
+                        weights_dir,
+                        f"task_{int(t)}_iter_{self.current_learning_iteration}.npz"
+                    ),
+                    task_weights=gating_weights[mask].cpu().numpy()
+                )
+
+        if self.current_learning_iteration % 10 == 0:
+            print(
+                "[MoE] mean expert weights:",
+                ", ".join(f"{w:.2f}" for w in mean_weights.tolist())
+            )
