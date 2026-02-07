@@ -162,13 +162,26 @@ C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe C:\Users\Pavel\IsaacLab\s
 ```
 
 
-### Run Multitasks Envs
+### Run the Multitask Environment
 
-Run MT4-Env via 
+Recommended to use 2048 parallel envs and 2-5K timesteps. Some tasks may converge before 2K timesteps.
+
+
+Run MT4-Env with PPO via 
 
 ```
-python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=1024 --max_iterations=2500  --run_name=run_multitask_exp_ppo --headless --append_task_id
+python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=2048 --max_iterations=5000  --run_name=run_multitask_ppo_final_52 --headless --seed 52
 ```
+Run MT4-Env with MoE-PPO architecture via:
+
+```
+python scripts\moe_quadruped\train_multitask_moe.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=2048 --max_iterations=5000  --run_name=run_multitask_final_moe_52  --seed 52 --append_task_id --headless
+```
+
+
+Run MT4-Env with DPMM-VAE PPO via 
+
+python scripts/moe_quadruped/train_multitask_dpmm_bnpy_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=512 --max_iterations=5000  --run_name=run_multitask_final_dpmm_vae_ppo_449  --seed 449 --append_task_id --headless 
 
 Run diagnostics
 
