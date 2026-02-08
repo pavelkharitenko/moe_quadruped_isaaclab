@@ -446,35 +446,55 @@ class AugmentedTrainer(BaseTrainer):
 
         self.encoder.eval()
 
+        task_names = ["FlatVel", "Handstand", "Legstand", "Crawl"]
+        task_colors = {
+            "FlatVel": "#2C7AC4",
+            "Handstand": "#55A868",
+            "Legstand": "#DD8452",
+            "Crawl": "#8172B2",
+        }
+
+        # DPMM cluster color palette
+        cluster_palette = [
+            "#63c1db",  # blue
+            "#76B7B2",  # teal
+            "#F28E2B",  # orange
+            "#B07AA1",  # purple
+            "#E15759",  # red
+            "#ED48E2",  # pink
+            "#82A14F",  # green
+        ]
+
         # Sample batch (same as training)
         e_data, d_data = self.replay_buffer.sample_random_few_step_batch(
             indices,
-            self.batch_size,
+            500,  #self.batch_size, 
             normalize=self.use_data_normalization,
         )
 
-        # ----- aquire ground-truth task (LAST timestep, consistent with training)
+        # ----- acquire ground-truth task (LAST timestep, consistent with training)
         obs_augmented = torch.as_tensor(d_data["observations"],
                                         device=self.device)[:, -1, :]  # [B, obs_dim + num_tasks + latent_z_dim]
+
         last_task_onehot = obs_augmented[:, -self.latent_dim - num_tasks:-self.latent_dim]  # [B, num_tasks]
+
         gt_labels = torch.argmax(last_task_onehot, dim=-1).cpu().numpy()
 
         # ----- encode
-        encoder_input = self.replay_buffer.make_encoder_data(e_data, self.batch_size)
+        encoder_input = self.replay_buffer.make_encoder_data(e_data, 500)  #self.batch_size)
         with torch.no_grad():
             mu, log_var = self.encoder.encode(encoder_input)
             z = self.encoder.sample(mu, log_var)
 
-        # Cluster assignment → TORCH
+        # ----- cluster assignment
         if self.encoder.bnp_model.model:
             _, cluster_ids = self.encoder.bnp_model.cluster_assignments(z)
             cluster_ids = np.asarray(cluster_ids)
         else:
             cluster_ids = np.zeros(z.shape[0], dtype=int)
 
-        # t-SNE → NUMPY
+        # ----- t-SNE
         z_np = z.detach().cpu().numpy()
-
         z_2d = TSNE(
             n_components=2,
             perplexity=min(perplexity,
@@ -483,36 +503,92 @@ class AugmentedTrainer(BaseTrainer):
             learning_rate="auto",
         ).fit_transform(z_np)
 
-        # ----- plot
-        plt.figure(figsize=(6, 6))
-        scatter = plt.scatter(
+        # ----- plotting
+        fig, ax = plt.subplots(figsize=(7, 5))
+
+        max_clusters = len(cluster_palette)
+        cluster_colors = [cluster_palette[cid % max_clusters] for cid in cluster_ids]
+
+        # Filled markers → DPMM clusters
+        ax.scatter(
             z_2d[:, 0],
             z_2d[:, 1],
-            c=cluster_ids,
-            cmap="tab10",
-            s=200,
-            alpha=0.8,
+            c=cluster_colors,
+            s=80,
+            alpha=0.85,
+            linewidths=0.5,
+            edgecolors="none",
         )
 
-        # Circle by ground-truth task
+        # Hollow markers → GT task (edge color)
+        gt_edge_colors = [task_colors[task_names[t]] for t in gt_labels]
 
-        # map GT task → color
-        task_cmap = cm.get_cmap("tab10")
-        edge_colors = task_cmap(gt_labels % 10)  # RGBA array
-
-        plt.scatter(
+        ax.scatter(
             z_2d[:, 0],
             z_2d[:, 1],
             facecolors="none",
-            edgecolors=edge_colors,
-            s=300,
-            linewidths=1.5,
+            edgecolors=gt_edge_colors,
+            s=100,
+            linewidths=1.6,
         )
 
-        plt.title("t-SNE: fill = DPMM cluster, edge = GT task")
-        plt.colorbar(scatter, label="DPMM cluster")
-        plt.tight_layout()
+        # ----- legend: clusters
+        cluster_handles = [
+            plt.Line2D(
+                [0],
+                [0],
+                marker="o",
+                linestyle="",
+                markerfacecolor=cluster_palette[i],
+                markeredgecolor="none",
+                label=f"Cluster {i}",
+                markersize=9,
+            ) for i in sorted(set(cluster_ids))
+        ]
+
+        cluster_legend = ax.legend(
+            handles=cluster_handles,
+            title="DPMM clusters",
+            fontsize=9,
+            title_fontsize=9,
+            loc="upper left",
+        )
+
+        ax.add_artist(cluster_legend)
+
+        # ----- legend: ground-truth tasks
+        task_handles = [
+            plt.Line2D(
+                [0],
+                [0],
+                marker="o",
+                linestyle="",
+                markerfacecolor="none",
+                markeredgecolor=color,
+                label=name,
+                markersize=9,
+                linewidth=1.6,
+            ) for name, color in task_colors.items()
+        ]
+
+        ax.legend(
+            handles=task_handles,
+            title="Ground-truth tasks",
+            fontsize=9,
+            title_fontsize=9,
+            loc="upper right",
+        )
+
+        # ----- axes styling (matching your other plots)
+        #ax.set_title("t-SNE: fill = DPMM cluster, edge = GT task", fontsize=11)
+        ax.set_xlabel("t-SNE dim 1", fontsize=10)
+        ax.set_ylabel("t-SNE dim 2", fontsize=10)
+        ax.tick_params(axis="both", labelsize=10)
+        ax.grid(True, linestyle="--", alpha=0.3)
+
+        fig.tight_layout()
+        fig.savefig(f"DPMM_clustering_{self.current_epoch}.png", dpi=300)
         plt.show()
-        plt.savefig(f"DPMM_clustering_{self.current_epoch}.png")
+        plt.close(fig)
 
         self.encoder.train()

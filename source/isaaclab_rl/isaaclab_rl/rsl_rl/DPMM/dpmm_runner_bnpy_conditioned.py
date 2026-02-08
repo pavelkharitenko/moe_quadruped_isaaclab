@@ -554,8 +554,8 @@ class DPMMRunnerConditioned(OnPolicyRunner):
             #batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,nw=self.dpmm_cfg.context_length)
 
             # update VAE's KL beta
-            if False and len(self.dpmm_buffer
-                             ) > self.dpmm_cfg.context_length and it > 40 and it % 4 == 0:  # training disabled for now
+            if len(self.dpmm_buffer
+                   ) > self.dpmm_cfg.context_length and it > 0 and it % 1 == 0:  # training disabled for now
 
                 vae_beta = min(self.dpmm_cfg.warmup.beta_final,
                                self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
