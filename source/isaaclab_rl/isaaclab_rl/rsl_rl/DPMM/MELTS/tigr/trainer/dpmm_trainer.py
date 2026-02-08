@@ -91,9 +91,8 @@ class AugmentedTrainer(BaseTrainer):
             self.encoder.bnp_model.fit(z)
             self.encoder.bnp_model.plot_clusters(z, suffix=str(current_epoch))
 
-
         # Visualize t-sne plot of DPMM using samples from current buffer
-        if current_epoch % 200 == 0:
+        if current_epoch % 2 == 0:
             self.online_tsne_plot(indices=train_indices)
 
         return self.lowest_loss_epoch
@@ -122,7 +121,7 @@ class AugmentedTrainer(BaseTrainer):
                                                                                               1:, :]  # [batch, time, 1]
 
         terminals = torch.as_tensor(d_data["terminals"], dtype=torch.float32, device=self.device)[:, 1:, :]
-
+        """
         true_tasks = torch.as_tensor(
             d_data["task_ids"],
             dtype=torch.float32,
@@ -136,6 +135,7 @@ class AugmentedTrainer(BaseTrainer):
         targets = torch.argmax(last_task_onehot, dim=-1)  # [B]
 
         unique_tasks = torch.unique(targets).tolist()
+        """
 
         decoder_state_target = next_states[:, :, :self.
                                            state_reconstruction_clip]  # torch.Size([batch_size_reconstruction, time_step, state_dim])
@@ -182,7 +182,6 @@ class AugmentedTrainer(BaseTrainer):
 
         self.recon_loss = torch.mean(mixture_nll).detach().cpu().numpy()
         # mean over batch
-        
 
         assert not torch.isnan(latent_variables).any(), latent_variables
         assert not torch.isnan(state_estimate).any(), state_estimate
@@ -224,7 +223,7 @@ class AugmentedTrainer(BaseTrainer):
                     var_comp[i, :] = self.encoder.bnp_model.comp_var[k]
                 var = torch.exp(0.5 * log_var)**2
                 kl_qz_pz = self.encoder.bnp_model.kl_divergence_diagonal_gaussian(mu, mu_comp, var, var_comp)
-            classification_acc = classification_accuracy(comps, targets.detach().cpu().numpy())
+            #classification_acc = classification_accuracy(comps, targets.detach().cpu().numpy())
 
         clustering_loss = self.alpha_kl_z * kl_qz_pz
 
@@ -239,6 +238,25 @@ class AugmentedTrainer(BaseTrainer):
         assert not torch.isnan(mixture_loss).any(), mixture_loss
 
         if self.use_PCGrad:
+            # to support PCGrad, put task_ids into d_data. Task ids can be recovered like in plotting validation function, if the RSL train script was was run with "--append_task_id" option.
+
+            raise NotImplementedError(
+                f'Option {self.PCGrad_option} for PCGrad was not implemented yet. Task_id dictionary required.')
+
+            true_tasks = torch.as_tensor(
+                d_data["task_ids"],
+                dtype=torch.float32,
+                device=self.device,
+            )
+
+            # take task from last timestep
+            last_task_onehot = true_tasks[:, -1, :]  # [B, n_tasks]
+
+            # convert one-hot → class index
+            targets = torch.argmax(last_task_onehot, dim=-1)  # [B]
+
+            unique_tasks = torch.unique(targets).tolist()
+
             # Find according class for every sample
             if self.PCGrad_option == 'true_task':
                 task_indices = targets
@@ -302,13 +320,11 @@ class AugmentedTrainer(BaseTrainer):
 
             # TB.TENSORBOARD_LOGGER.add_scalar('training/ti_classification_acc', (torch.argmax(gammas, dim=-1) == targets).float().mean().item(), global_step=TB.TI_LOG_STEP)
             # TODO: Check the accuracy calculation
-            TB.TENSORBOARD_LOGGER.add_scalar('training/ti_classification_acc',
-                                             classification_acc,
-                                             global_step=TB.TI_LOG_STEP)
+            #TB.TENSORBOARD_LOGGER.add_scalar('training/ti_classification_acc',
+            #                                 classification_acc,
+            #                                 global_step=TB.TI_LOG_STEP)
             # if self.use_regularization_loss:
             #     TB.TENSORBOARD_LOGGER.add_scalar('training/ti_mixture_regularization_loss', reg_loss.mean().item(), global_step=TB.TI_LOG_STEP)
-            
-
 
         TB.TI_LOG_STEP += 1
 
@@ -331,15 +347,15 @@ class AugmentedTrainer(BaseTrainer):
         rewards = torch.as_tensor(d_data["rewards"], dtype=torch.float32, device=self.device)[:, -1, :]
 
         terminals = torch.as_tensor(d_data["terminals"], dtype=torch.float32, device=self.device)[:, -1, :]
-
-        # Task labels (same semantics as RLKit)
+        """
+        # Task labels 
         true_task = np.array(
             [a["base_task"] for a in d_data["true_tasks"][:, -1, 0]],
             dtype=np.int64,
         )
 
         targets = torch.as_tensor(true_task, dtype=torch.long, device=self.device)
-
+        """
         decoder_state_target = next_states[:, :self.state_reconstruction_clip]
         '''
         MIXTURE MODEL
@@ -421,8 +437,12 @@ class AugmentedTrainer(BaseTrainer):
             0.0,
         )
 
-    def online_tsne_plot(self, indices, perplexity=30):
-        
+    def online_tsne_plot(self, indices, perplexity=30, num_tasks=4):
+        """
+        Plot the cluster and evaluate given true task ids.
+        Task ids can be recovered from observations, if the environment was run with "--append_task_id" flag.
+        The observation is then structured as: obs = [ obs_env | task_onehot | latent_z ]
+        """
 
         self.encoder.eval()
 
@@ -433,11 +453,11 @@ class AugmentedTrainer(BaseTrainer):
             normalize=self.use_data_normalization,
         )
 
-        # ----- ground-truth task (LAST timestep, consistent with training)
-        true_tasks = torch.as_tensor(
-            d_data["task_ids"], device=self.device
-        )[:, -1, :]
-        gt_labels = torch.argmax(true_tasks, dim=-1).cpu().numpy()
+        # ----- aquire ground-truth task (LAST timestep, consistent with training)
+        obs_augmented = torch.as_tensor(d_data["observations"],
+                                        device=self.device)[:, -1, :]  # [B, obs_dim + num_tasks + latent_z_dim]
+        last_task_onehot = obs_augmented[:, -self.latent_dim - num_tasks:-self.latent_dim]  # [B, num_tasks]
+        gt_labels = torch.argmax(last_task_onehot, dim=-1).cpu().numpy()
 
         # ----- encode
         encoder_input = self.replay_buffer.make_encoder_data(e_data, self.batch_size)
@@ -457,11 +477,11 @@ class AugmentedTrainer(BaseTrainer):
 
         z_2d = TSNE(
             n_components=2,
-            perplexity=min(perplexity, len(z_np) - 1),
+            perplexity=min(perplexity,
+                           len(z_np) - 1),
             init="pca",
             learning_rate="auto",
         ).fit_transform(z_np)
-
 
         # ----- plot
         plt.figure(figsize=(6, 6))
@@ -489,11 +509,10 @@ class AugmentedTrainer(BaseTrainer):
             linewidths=1.5,
         )
 
-
         plt.title("t-SNE: fill = DPMM cluster, edge = GT task")
         plt.colorbar(scatter, label="DPMM cluster")
         plt.tight_layout()
         plt.show()
+        plt.savefig(f"DPMM_clustering_{self.current_epoch}.png")
 
         self.encoder.train()
-

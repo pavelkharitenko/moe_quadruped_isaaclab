@@ -24,22 +24,19 @@ class DpmmVaeCfgBnpy:
     # General / logging
     log_interval = 10
     reselect_envs_interval = 1000
-    num_tasks = 2
+    num_tasks = 4
 
-    # DPMM Buffer & Trajectory
+    # DPMM Buffer specific only
     num_envs_per_iter = 0.6  # fraction percentage of total envs to sample trajectories from (e.g. 60/100)
-    dpmm_buffer_size = 100_000
     context_length = 24
+    dpmm_buffer_size = 100_000
     max_traj_len = 1000
-    batch_size = 512 #256
-
-    # Environment / model dims
-    trajectory_length = 64
-    time_steps = 23
+    batch_size = 256  #256
 
     # Encoder & Decoder
+    time_steps = 23  # context_length to encoder, its (contex_length-1) of buffer
     shared_dim = 128  # VAE encoder's inner layers size
-    z_dim = 12  # latent dim
+    z_dim = 12  # latent dimension
 
     # NOTE: legacy MELTS used this for GMM/DPMM
     #state_dim = 247  # obs_dim + z_dim in old setup
@@ -48,16 +45,16 @@ class DpmmVaeCfgBnpy:
     class bnp_model:
         gamma0 = 5.0
         num_lap = 20
-        start_epoch = 0 # default
-        fit_interval = "epoch" # default is "adaptive"
+        start_epoch = 0  # default
+        fit_interval = "epoch"  # default is "adaptive"
 
         class birth:
             start_lap = 1
             stop_lap = 10
             k_fresh = 2
-            min_num_atoms_for_new_comp = 8 # 16
-            min_num_atoms_for_target_comp = 8 # 16
-            min_num_atoms_for_retain_comp = 8 # 16
+            min_num_atoms_for_new_comp = 8  # 16
+            min_num_atoms_for_target_comp = 8  # 16
+            min_num_atoms_for_retain_comp = 8  # 16
             min_perc_change_to_reactivate = 0.05
             debug_output_dir = None
             debug_write_html = 0
@@ -71,7 +68,7 @@ class DpmmVaeCfgBnpy:
 
     # Training
     class trainer:
-        batch_size_rollout = 512 #256
+        batch_size_rollout = 256  #256
         lr_decoder = 3e-4
         lr_encoder = 3e-4
 
@@ -95,7 +92,7 @@ class DpmmVaeCfgBnpy:
         pcgrad_option = "true_task"
         optimizer_class = "Adam"
 
-        mixture_steps = 64 #32
+        mixture_steps = 64  #32
 
     # Warmup
     class warmup:

@@ -33,7 +33,7 @@ from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.dpmm_inference import Dec
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.trainer.dpmm_trainer import AugmentedTrainer
 
 
-class DPMMRunner(OnPolicyRunner):
+class DPMMRunnerConditioned(OnPolicyRunner):
     """On-policy runner for training and evaluation."""
 
     def __init__(self, env: VecEnv, train_cfg: dict, log_dir: str | None = None, device="cpu"):
@@ -42,6 +42,10 @@ class DPMMRunner(OnPolicyRunner):
         self.policy_cfg = train_cfg["policy"]
         self.device = device
         self.env = env
+
+        # load DPMM Cfg
+        dpmm_cfg = DpmmVaeCfgBnpy
+        self.dpmm_cfg = dpmm_cfg
 
         # check if multi-gpu is enabled
         self._configure_multi_gpu()
@@ -57,6 +61,8 @@ class DPMMRunner(OnPolicyRunner):
         # resolve dimensions of observations
         obs, extras = self.env.get_observations()
         num_obs = obs.shape[1]
+
+        # add latent dimension encoding to obs_dim:
 
         # resolve type of privileged observations
         if self.training_type == "rl":
@@ -79,7 +85,10 @@ class DPMMRunner(OnPolicyRunner):
         # evaluate the policy class
         policy_class = eval(self.policy_cfg.pop("class_name"))
         policy: MoEActorCritic | MyActorCritic | ActorCritic | ActorCriticRecurrent | StudentTeacher | StudentTeacherRecurrent = policy_class(
-            num_obs, num_privileged_obs, self.env.num_actions, **self.policy_cfg).to(self.device)
+            num_obs + self.dpmm_cfg.z_dim,  # account for latent z dim
+            num_privileged_obs + self.dpmm_cfg.z_dim,  # account for latent z dim
+            self.env.num_actions,
+            **self.policy_cfg).to(self.device)
 
         # resolve dimension of rnd gated state
         if "rnd_cfg" in self.alg_cfg and self.alg_cfg["rnd_cfg"] is not None:
@@ -100,6 +109,7 @@ class DPMMRunner(OnPolicyRunner):
             self.alg_cfg["symmetry_cfg"]["_env"] = env
 
         # initialize algorithm
+
         alg_class = eval(self.alg_cfg.pop("class_name"))
         self.alg: PPO | Distillation = alg_class(policy,
                                                  device=self.device,
@@ -123,8 +133,8 @@ class DPMMRunner(OnPolicyRunner):
             self.training_type,
             self.env.num_envs,
             self.num_steps_per_env,
-            [num_obs],
-            [num_privileged_obs],
+            [num_obs + self.dpmm_cfg.z_dim],  # PPO will be conditioned on latent z, so add z dim (for PPO only)
+            [num_privileged_obs + self.dpmm_cfg.z_dim],  # same for priv. obs
             [self.env.num_actions],
         )
 
@@ -149,8 +159,7 @@ class DPMMRunner(OnPolicyRunner):
         self.z_dim = encoder_cfg["z_dim"]
         self.current_z = torch.zeros(env.num_envs, self.z_dim, device=device)
         """
-        dpmm_cfg = DpmmVaeCfgBnpy
-        self.dpmm_cfg = dpmm_cfg
+
         self.dpmm_total_update_steps = 0
 
         absolute_log_dir = os.path.abspath(  # logdir for DPMM-VAE training
@@ -189,7 +198,7 @@ class DPMMRunner(OnPolicyRunner):
         )
 
         # Derive dimensions from runner / env
-        obs_dim = num_obs  # from env.get_observations()
+        obs_dim = num_obs  # from env.get_observations(), obs for encoder are without latent dim
         action_dim = self.env.num_actions
         reward_dim = 1  # scalar reward (RL assumption)
         state_dim = obs_dim  # state == observation
@@ -199,8 +208,7 @@ class DPMMRunner(OnPolicyRunner):
             state_dim +  # s_t
             action_dim +  # a_t
             reward_dim +  # r_t
-            state_dim +  # s_{t+1}
-            tasks_num  # task one-hot
+            state_dim  # s_{t+1}
         )
 
         shared_dim = self.dpmm_cfg.shared_dim
@@ -217,6 +225,8 @@ class DPMMRunner(OnPolicyRunner):
             encoder_type="gru",
             bnp_model=bnp_model,
         )
+
+        self.encoder = encoder
 
         # Decoder
         decoder = DecoderMDP(
@@ -261,7 +271,20 @@ class DPMMRunner(OnPolicyRunner):
             log_dir=self.log_dir,
         )
 
-        # subset of envs that contribute to dpmm buffer
+        # for conditioning PPO: track last context_length-steps, pass to encoder before PPO rollout stage
+        self.context_buffer = torch.zeros(
+            self.env.num_envs,
+            self.dpmm_cfg.time_steps,
+            transition_dim,
+            device=self.device,
+        )
+        self.context_ptr = torch.zeros(
+            self.env.num_envs,
+            dtype=torch.long,
+            device=self.device,
+        )
+
+        # select subset of envs that contribute to dpmm buffer
         self.dpmm_selected_sample_envs = self.select_random_envs()
 
     def select_random_envs(self):
@@ -416,16 +439,41 @@ class DPMMRunner(OnPolicyRunner):
 
             # === Collect rollouts ===
             with torch.inference_mode():
+
+                # first todo for conditioned PPO: inject latent z to PPO before rollout
+
+                z, assignments = self.encoder(
+                    self.context_buffer)  # we dont need to clone() the buffer, since we use torch.inference_mode()
+                #self.alg.set_latent(z)  # now pi(. |z)
+
                 for _ in range(self.num_steps_per_env):
+
+                    # append latent z every step to obs, so pi(a|s) => pi(a|s,z)
+                    obs_z = torch.cat([obs, z], dim=-1)  # now combine with the latent encoding z
+                    privileged_obs_z = torch.cat([privileged_obs, z], dim=-1)
+
                     # sample actions
-                    actions = self.alg.act(obs, privileged_obs)
+                    actions = self.alg.act(obs_z, privileged_obs_z)
 
                     # step environment & move to device
                     obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
                     obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
-                    # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
+                    # for PPO inferring the DPMM-VAE later: remeber last (context_length)-transitions:
+                    transition_context = torch.cat(
+                        [
+                            prev_obs,  # [N, Ds]
+                            actions,  # [N, Da]
+                            rewards.unsqueeze(-1),  # [N, 1]
+                            obs,  # [N, Ds]
+                        ],
+                        dim=-1)
 
+                    idx = self.context_ptr  # [N]
+                    self.context_buffer[torch.arange(self.env.num_envs), idx] = transition_context
+                    self.context_ptr = (self.context_ptr + 1) % self.dpmm_cfg.time_steps  # increase
+
+                    # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
                     # first check if new subenvs should be sampled from tasks
                     # TODO flush remaining trajectories or set _dpm_trajs list empty when resetting
                     if self.dpmm_total_update_steps % self.dpmm_cfg.reselect_envs_interval == 0:
@@ -488,7 +536,7 @@ class DPMMRunner(OnPolicyRunner):
 
                 # Compute returns
                 if self.training_type == "rl":
-                    self.alg.compute_returns(privileged_obs)
+                    self.alg.compute_returns(privileged_obs_z)
 
             # log DPMM-buffer statistics
             if len(self.dpmm_buffer) > 0:
@@ -506,7 +554,8 @@ class DPMMRunner(OnPolicyRunner):
             #batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,nw=self.dpmm_cfg.context_length)
 
             # update VAE's KL beta
-            if len(self.dpmm_buffer) > self.dpmm_cfg.context_length and it > 0 and it % 1 == 0:
+            if False and len(self.dpmm_buffer
+                             ) > self.dpmm_cfg.context_length and it > 40 and it % 4 == 0:  # training disabled for now
 
                 vae_beta = min(self.dpmm_cfg.warmup.beta_final,
                                self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)

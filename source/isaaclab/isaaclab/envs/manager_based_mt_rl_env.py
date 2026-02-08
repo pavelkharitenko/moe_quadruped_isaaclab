@@ -110,10 +110,8 @@ class ManagerBasedMTRLEnv(gym.Env):
 
             # note (mt-isaac): collision filtering is handled outside the loop
             rl_env_cfg.scene.filter_collisions = True  # TODO need to change back?
-            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
-            print("TaskName:", task_name)
-            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+
+            print("||||||||||||||||||||||| TaskName:", task_name, "|||||||||||||||||||||||||||")
 
             self.envs[task_name] = ManagerBasedRLEnv(rl_env_cfg, sim=self.sim, render_mode=render_mode)
             env_prim_paths.extend(self.envs[task_name].scene.env_prim_paths)
