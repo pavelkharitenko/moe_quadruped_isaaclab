@@ -77,18 +77,7 @@ def legstand_base_contact_penalty(
     return -torch.clamp(contact, min=0.0, max=100.0).sum(dim=1) / 100.0
 
 
-"""
-def legstand_joint_limit_penalty(
-    env: ManagerBasedRLEnv,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-) -> torch.Tensor:
-    #Penalize joint positions being close to or beyond their limits.
-    asset: RigidObject = env.scene[asset_cfg.name]
-    dof_mid = (asset.data.soft_joint_pos_limits[:, 0] + asset.data.soft_joint_pos_limits[:, 1]) * 0.5
-    dof_range = (asset.data.soft_joint_pos_limits[:, 1] - asset.data.soft_joint_pos_limits[:, 0]) * 0.5
-    distance = torch.abs(asset.data.joint_pos - dof_mid) / (dof_range + 1e-6)
-    return torch.sum(distance ** 5, dim=1) / asset.num_dof
-"""
+
 
 
 def legstand_drift_penalty(

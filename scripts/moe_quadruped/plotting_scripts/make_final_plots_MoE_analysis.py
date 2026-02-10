@@ -6,7 +6,7 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 # -------------------------------
 # Path to your TensorBoard log directory
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe"
+log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52"
 
 # -------------------------------
 # Metrics to plot
@@ -88,7 +88,7 @@ from mpl_toolkits.mplot3d import Axes3D
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe\gating_weights"
+log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
 num_tasks = 4
 num_experts = 4
 bins = np.linspace(0, 1, 21)  # histogram bins for weights
@@ -207,7 +207,7 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe\gating_weights"
+log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52\gating_weights"
 
 task_to_plot = 0   # e.g., Task 0
 num_experts = 4

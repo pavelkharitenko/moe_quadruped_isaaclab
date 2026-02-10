@@ -7,12 +7,13 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 # Multitask runs (different seeds)
 # ------------------------------------------------------------------
 run_dirs = [
+    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-08_10-49-51_run_multitask_final_ppo_52",
     #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_09-30-23_run_multitask_exp_ppo_449",
     #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_14-03-44_run_multitask_final_ppo_12"
     
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52",
+    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52", # this one used for moe analysis
+    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
+    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
 ]
 
 # ------------------------------------------------------------------
@@ -141,7 +142,8 @@ ax.fill_between(
 ax.set_ylabel("Episode Return", fontsize=10)
 ax.tick_params(axis="both", labelsize=10)
 ax.grid(True)
-ax.legend(fontsize=9)
+ax.legend(fontsize=9, loc="lower right")
+ax.set_ylim(top=40.25)
 
 # ==============================
 # Bottom: Per-task rewards

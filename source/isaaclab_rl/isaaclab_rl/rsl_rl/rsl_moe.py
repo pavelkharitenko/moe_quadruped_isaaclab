@@ -485,18 +485,13 @@ class MyOnPolicyRunner(OnPolicyRunner):
 
     def _log_moe_diagnostics(self, obs: torch.Tensor, num_tasks=4):
         """
-        Logging function for MoE statistics, if not running MoE, can be ignored or removed
-        
-        :param self: Description
-        :param obs: Description
+        Logging function for MoE statistics, if not running MoE, can be ignored or removed.
+        Adds storage of raw gating weights for offline plotting/histogram analysis.
+
+        :param obs: observations tensor
         :type obs: torch.Tensor
-        :param num_tasks: provide for logging the true task number
+        :param num_tasks: number of tasks
         """
-
-        if self.current_learning_iteration % 20 != 0:
-            return  # skip logging for other iterations
-
-
         policy = self.alg.policy
 
         if not hasattr(policy, "num_experts"):
@@ -511,7 +506,11 @@ class MyOnPolicyRunner(OnPolicyRunner):
 
         with torch.no_grad():
             # subsample for speed + stability
-            obs = obs[: min(2048, obs.shape[0])]
+            B = obs.shape[0]
+            n = min(2048, B)
+            idx = torch.randperm(B, device=obs.device)[:n]
+            obs = obs[idx]
+
 
             # ---- gating ----
             gating_logits = policy.gating_network(obs)
@@ -547,6 +546,10 @@ class MyOnPolicyRunner(OnPolicyRunner):
             # =====================================================
             task_one_hot = obs[:, -num_tasks:]
             task_ids = torch.argmax(task_one_hot, dim=-1)
+            print("333333333333333333333333333333333333333333333333")
+            print("333333333333333333333333333333333333333333333333")
+            print("333333333333333333333333333333333333333333333333")
+            print("TASK IDS registered:", task_ids)
 
             for t in torch.unique(task_ids):
                 mask = task_ids == t
