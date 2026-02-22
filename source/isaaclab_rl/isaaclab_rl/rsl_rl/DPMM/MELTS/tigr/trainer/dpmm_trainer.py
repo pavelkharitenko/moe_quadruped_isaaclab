@@ -8,6 +8,8 @@ from jsonlines import jsonlines
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import matplotlib.cm as cm
+from datetime import datetime
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 
 #import rlkit.torch.pytorch_util as ptu
 
@@ -591,4 +593,80 @@ class AugmentedTrainer(BaseTrainer):
         plt.show()
         plt.close(fig)
 
+        # save latent space as well
+        save_dir = self.save_tsne_artifacts(
+            z_np=z_np,
+            z_2d=z_2d,
+            cluster_ids=cluster_ids,
+            gt_labels=gt_labels,
+            perplexity=perplexity,
+            num_tasks=num_tasks,
+        )
+
+        # Save figure
+        fig.savefig(os.path.join(save_dir, "tsne_plot.png"), dpi=300)
+        fig.savefig(os.path.join(save_dir, "tsne_plot.pdf"))
+
         self.encoder.train()
+
+
+
+
+
+
+    def save_tsne_artifacts(
+        self,
+        z_np,
+        z_2d,
+        cluster_ids,
+        gt_labels,
+        perplexity,
+        num_tasks,
+        save_root="tsne_logs",
+    ):
+        """
+        Save full clustering artifacts for reproducibility.
+        """
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        run_name = f"epoch_{self.current_epoch}_{timestamp}"
+        save_dir = os.path.join(save_root, run_name)
+        os.makedirs(save_dir, exist_ok=True)
+
+        # --------------------------
+        # Metrics
+        # --------------------------
+        ari = adjusted_rand_score(gt_labels, cluster_ids)
+        nmi = normalized_mutual_info_score(gt_labels, cluster_ids)
+
+        # --------------------------
+        # Save embeddings
+        # --------------------------
+        np.savez(
+            os.path.join(save_dir, "embeddings.npz"),
+            z=z_np,
+            z_2d=z_2d,
+            cluster_ids=cluster_ids,
+            gt_labels=gt_labels,
+        )
+
+        # --------------------------
+        # Save metadata
+        # --------------------------
+        metadata = {
+            "epoch": int(self.current_epoch),
+            "perplexity": float(perplexity),
+            "num_samples": int(len(z_np)),
+            "num_tasks": int(num_tasks),
+            "num_clusters": int(len(np.unique(cluster_ids))),
+            "ARI": float(ari),
+            "NMI": float(nmi),
+        }
+
+        with open(os.path.join(save_dir, "metadata.json"), "w") as f:
+            json.dump(metadata, f, indent=4)
+
+        print(f"[TSNE SAVE] Saved artifacts to: {save_dir}")
+        print(f"[TSNE SAVE] ARI: {ari:.4f} | NMI: {nmi:.4f}")
+
+        return save_dir

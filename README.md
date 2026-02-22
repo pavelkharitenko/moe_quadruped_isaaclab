@@ -1,7 +1,7 @@
 
 ## Multitask Reinforcement Learning of Quadrupeds based on Mixtures of Experts and Bayesian Nonparametric Representations
 
-![alt text](figures/framework_overview.png)
+![](figures/framework_overview.png)
 
 ## Commands
 
@@ -25,13 +25,11 @@ python scripts\moe_quadruped\train_multitask_moe.py --task=Isaac-MT-Unitree-Go2-
 
 Run MT4-Env with DPMM-VAE PPO via 
 
+
+```
 python scripts/moe_quadruped/train_multitask_dpmm_bnpy_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=512 --max_iterations=5000  --run_name=run_multitask_final_dpmm_vae_ppo_449  --seed 449 --append_task_id --headless 
-
-Run diagnostics
-
 ```
-C:/Users/Pavel/miniconda3/envs/env_isaaclab/python.exe .\scripts\moe_quadruped\plot_diagnostics.py --single .\logs\rsl_rl\unitree_go2_flat\2025-11-03_10-21-04_run28_st\ --multi .\logs\rsl_rl\unitree_go2_flat\2025-11-03_09-43-13_run26\
-```
+
 
 
 ### Single task environments
@@ -46,15 +44,17 @@ python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-
 
 Run Handstand Task training:
 
-´´´
+```
 python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-Flat-HandStand-Unitree-Go2-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=handstand_go2_st --run_name=run_handstand --headless 
-´´´
+```
 
 Run Legstand Task training:
 
-´´´
-python scripts/moe_quadruped/train_single_ppo.py --task=Velocity-LegStand-Unitree-Go2-MoE-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=legstand_go2_st --run_name=run_legstand --headless
-´´´
+```
+python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-LegStand-Unitree-Go2-MoE-v0 --num_envs=2048 --max_iterations=1500 --experiment_name=legstand_go2_st --run_name=run_legstand --headless
+```
+
+
 
 Run Crawl Task:
 
@@ -83,7 +83,51 @@ Code based on original author of MT-IsaacLab https://github.com/meenalparakh/MT-
 
 ## Folder structure
 
+### Tasks
 
+Single tasks code in 
+
+```
+source\isaaclab_tasks\isaaclab_tasks\manager_based\locomotion\velocity\config\go2_moe\
+```
+
+Multitask code in
+
+```
+source\isaaclab_tasks\isaaclab_tasks\manager_based\locomotion_multitask\velocity\config\go2_mt\
+```
+
+`mt4_env_cfg.py` implements the joint multitask environment.
+
+
+### Scripts
+
+All our training scripts `train_ ... .py` are in  
+
+```
+scripts\moe_quadruped\
+```
+
+
+Custom RSL RL code for `MoE Actor`, `DPMM-VAE` in
+
+```
+source\isaaclab_rl\isaaclab_rl\rsl_rl\
+```
+
+and 
+
+
+```
+source\isaaclab_rl\isaaclab_rl\rsl_rl\DPMM\
+```
+
+
+For DPMM-VAE Trainer code located in
+
+```
+source\isaaclab_rl\isaaclab_rl\rsl_rl\DPMM\MELTS\tigr\trainer\dpmm_trainer.py
+```
 
 ## MT4 was created by:
 
