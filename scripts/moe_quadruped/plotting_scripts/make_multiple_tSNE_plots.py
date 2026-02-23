@@ -193,10 +193,6 @@ def plot_multiple_runs(run_dirs):
         plot_run_tsne(run_dir)
 
 
-run_dirs = [
-    #r"logs/rsl_rl/unitree_go2_multitask/2026-02-22_20-30-28_dpmm_final_cond_testing_43",
-    r"logs\rsl_rl\unitree_go2_multitask\2026-02-22_21-36-41_dpmm_final_cond_testing_43",
-    r"logs\rsl_rl\unitree_go2_multitask\2026-02-22_22-09-56_dpmm_final_43",
-]
+run_dirs = []
 
 plot_multiple_runs(run_dirs)

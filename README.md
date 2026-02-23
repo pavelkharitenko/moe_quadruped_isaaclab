@@ -3,27 +3,88 @@
 
 ![](figures/framework_overview.png)
 
+
+
+## Installation
+
+
+### Install IsaacGym, IsaacLab & clone this repository
+
+To install this code, follow the official [IsaacLab installation](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html) but clone this repository instead of the default repo in their docs. 
+
+(Notice: This repository uses the __bnpy__ python library for the DPMM implementation, which is not available on Windows. Install and run on Linux or don't use the DPMM related code. The multitask environment can be still run on Windows but DPMM-VAE is not available then.)
+
+1. [Install IsaacSim (Choose pip or binary installation, what you prefer.)](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html) 
+
+ - When runnning `pip install "isaacsim[all,extscache]==4.5.0"` and `conda create -n env_isaaclab python=3.10`, we used IsaacLab __4.5.0__ and python __3.10__, but newer versions may work as well.
+
+ - When running `pip install -U torch== ...` install the pytorch version suitable for your GPU. We used PyTorch version __2.8.0+cu126__ and TorchVision version __0.23.0+cu126__. Use `pip install --force-reistall torch torchvision ... pytorch.org/whl/cu12x (lower x)` if V100 GPU is outdated for your PyTorch version. After downgrading, numpy might be too new, try to downgrade via `pip install numpy<2`
+
+2. [Install IsaacLab](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html#installing-isaac-lab): 
+
+- Clone __this__ repository.
+
+- When running `isaaclab.sh --install`, run without arguments to install all RL libraries or add `rsl_rl`. This repo uses RSL RL for the algorithms (installing skrl, sb3, etc. not needed).
+
+
+### Installing python libraries
+
+1. Install missing python packages for pip, inside the conda environment created in the last section.
+
+- Run the single task as a test to see if your isaaclab installation and python packages have been installed completely:
+
+
+```bash
+conda activate env_isaaclab
+
+
+cd moe_quadruped_isaaclab/
+
+python scripts/moe_quadruped/train_single.py --task=Isaac-Velocity-Flat-Unitree-Go2-MoE-v0  --num_envs=256  --max_iterations=200 --experiment_name=flat_go2_single --run_name=run_flatveltracking --headless
+```
+ 
+This command might take a while to run, you should see rewards being logged and iteration numbers after a while.
+
+2. Install Visualization tools
+
+`cd vis_utils/` 
+
+and then run 
+
+`python -m pip install -e .`
+
+
+3. Other packages:
+
+- We provide a requirements.txt and environment.yml file for reference, but we recommend installing missing packages at hand. Some versions might become uncompatible with newer isaaclab. 
+
+- The PyTorch library might consider your GPU as outdated. Try to downgrade Pytorch like written above. Also might be necesary to downgrade `numpy` afterwards. Try then to downgrade your numpy like written above some subversions down until no error is available.
+
+
 ## Commands
 
 
-### Run the Multitask Environment
+### Running the Multitask Environment
 
 Recommended to use 2048 parallel envs and 2-5K timesteps. Some tasks may converge before 2K timesteps.
 
+The arg `--num_envs=2048` is per task. Using e.g. 4 tasks, a total of 8192 envs will be created.
 
-Run MT4-Env with PPO via 
+Add `--headless` flag when runnning on a remote server. Add `--append_task_id` if one-hot vector needed.
+
+### Run MT4-Env (four quadruped tasks) with PPO via 
 
 ```
-python scripts/moe_quadruped/train_multitask_ppo.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=2048 --max_iterations=5000  --run_name=run_multitask_ppo_final_52 --headless --seed 52
+python scripts/moe_quadruped/train_multitask_dpmm_conditioned.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=2048 --max_iterations=5000  --run_name=run_multitask_ppo_final_52 --seed 52 --append_task_id --headless
 ```
-Run MT4-Env with MoE-PPO architecture via:
+### Run MT4-Env with MoE-PPO architecture via:
 
 ```
 python scripts\moe_quadruped\train_multitask_moe.py --task=Isaac-MT-Unitree-Go2-v0 --num_envs=2048 --max_iterations=5000  --run_name=run_multitask_final_moe_52  --seed 52 --append_task_id --headless
 ```
 
 
-Run MT4-Env with DPMM-VAE PPO via 
+### Run MT4-Env with DPMM-VAE PPO via 
 
 
 ```
@@ -55,7 +116,6 @@ python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-LegStand-
 ```
 
 
-
 Run Crawl Task:
 
 ```
@@ -67,7 +127,7 @@ python scripts/moe_quadruped/train_single_ppo.py --task=Isaac-Velocity-Lowcrawl-
 
 ## Multitask Environment
 
-Code based on original author of MT-IsaacLab https://github.com/meenalparakh/MT-IsaacLab
+Code based on original author of MT-IsaacLab https://github.com/meenalparakh/MT-IsaacLab.
 
 ### Add new tasks:
 
@@ -123,31 +183,15 @@ source\isaaclab_rl\isaaclab_rl\rsl_rl\DPMM\
 ```
 
 
-For DPMM-VAE Trainer code located in
+For DPMM-VAE, Trainer code located in
 
 ```
 source\isaaclab_rl\isaaclab_rl\rsl_rl\DPMM\MELTS\tigr\trainer\dpmm_trainer.py
 ```
 
-## MT4 was created by:
+DPMM-VAE additional methods, like buffer code and sampling located in 
 
+```
+source\isaaclab_rl\isaaclab_rl\rsl_rl\DPMM\dpmm_utils.py
+```
 
-1. Create in source/isaaclab/envs/ two files, `manager_based_mt_rl_env(_cfg).py`, export their classes in `__init__.py`
-
-2. Create folder in source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity, with similar structure to how the normal locomotion/velocity folder is.
-
-3. In the normal velocity/velocity_env_cfg.py, we have MySceneCfg and LocomotionVelocityRoughEnvCfg, here we change both to fit Multitask setting: MySceneCfg should differntiate world- and task specific scene elements through self.world_ prefix. LocomotionVelocityRoughEnvCfg should have no __post_init__(self) method and subclass from TaskConfigs.
-
-4. In velocity/config/ dir, create the multitask env go2_mt. Here we need to rewrite the original go2 configs rough_env_cfg.py, flat_env_cfg.py, ... etc. to match the multitask configs:
-
-- import LocomotionVelocityRoughEnvCfg from isaaclab_tasks.manager_based.locomotion_multitask instead from locomotion.velocity
-
-- subclass it to create UnitreeGo2RoughEnvCfg
-
-- remove super.__init__(), and just write everything inside __post_init__(self)
-
-5. Write the actual Multitask Environment: create a file, mt_env_cfg.py, in which a MTLocomotion class subclasses ManagerBasedMTRL. 
-
-- Put all tasks coded according to step 4. as attributes. 
-
-- Write a function __post_init__(self) in which all setups of __post__init() of LocomotionVelocityRoughEnvCfg should be done.

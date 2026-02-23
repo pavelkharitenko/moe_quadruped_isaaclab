@@ -23,8 +23,7 @@ from rsl_rl.modules import (
 )
 
 # DPMM-VAE imports
-from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import (DPMMReplayBuffer, Transition, LatentInjectedEnvWrapper, class_to_dict)
-
+from isaaclab_rl.rsl_rl.DPMM.dpmm_utils import DPMMReplayBuffer, Transition
 from isaaclab_rl.rsl_rl.DPMM.dpmm_config import DpmmVaeCfgBnpy
 
 from isaaclab_rl.rsl_rl.DPMM.MELTS.tigr.task_inference.prediction_networks import DecoderMDP
@@ -153,14 +152,13 @@ class DPMMRunnerConditioned(OnPolicyRunner):
         if hasattr(policy, 'num_experts'):
             print(f"Number of experts: {policy.num_experts}")
 
-        # DPMM-VAE initialization
-        # --- Context encoding ---
-        """
-        self.z_dim = encoder_cfg["z_dim"]
-        self.current_z = torch.zeros(env.num_envs, self.z_dim, device=device)
-        """
 
-        self.dpmm_total_update_steps = 0
+
+        # DPMM-VAE related initializations:
+
+
+        self.dpmm_vae_total_updates = 0
+        self.dpmm_buffer_total_update_steps = 0
 
         absolute_log_dir = os.path.abspath(  # logdir for DPMM-VAE training
             f"./logs/dpmm/dpmm_logs_session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
@@ -241,6 +239,7 @@ class DPMMRunnerConditioned(OnPolicyRunner):
         encoder.to(self.device)
         decoder.to(self.device)
 
+        # DPMM-VAE trainer: Learns latent space, and fits DPMM to latent z
         self.dpmm_trainer = AugmentedTrainer(
             encoder=encoder,
             decoder=decoder,
@@ -271,7 +270,7 @@ class DPMMRunnerConditioned(OnPolicyRunner):
             log_dir=self.log_dir,
         )
 
-        # for conditioning PPO: track last context_length-steps, pass to encoder before PPO rollout stage
+        # for conditioning PPO: track last-len(context) env. steps, and pass to encoder to compute latent z
         self.context_buffer = torch.zeros(
             self.env.num_envs,
             self.dpmm_cfg.time_steps,
@@ -376,7 +375,10 @@ class DPMMRunnerConditioned(OnPolicyRunner):
                     )
 
     def learn(self, num_learning_iterations: int, init_at_random_ep_len: bool = False):
-        """Extended learn() with full diagnostics for PPO buffer and reward statistics."""
+        """
+        Extended learn() that encodes a latent z before running PPO rollouts. Updates then PPO and DPMM-VAE encoder.
+        
+        """
 
         # === Initialize logger ===
         if self.log_dir is not None and self.writer is None and not self.disable_logs:
@@ -395,20 +397,6 @@ class DPMMRunnerConditioned(OnPolicyRunner):
             else:
                 raise ValueError("Logger type not found. Choose 'neptune', 'wandb' or 'tensorboard'.")
 
-        # === Sanity print ===
-        print(f"\n--- PPO Learn Initialization ---")
-        print(f"Device: {self.device}")
-        print(f"num_envs: {self.env.num_envs}, num_steps_per_env: {self.num_steps_per_env}")
-        print(f"Total rollout batch size: {self.env.num_envs * self.num_steps_per_env}")
-        if hasattr(self.alg, "storage"):
-            try:
-                obs_shape = getattr(self.alg.storage, "observations", torch.empty(0)).shape
-                print(f"Storage observations shape: {obs_shape}")
-            except Exception as e:
-                print(f"(Could not access storage shape: {e})")
-        print(f"num_learning_epochs: {getattr(self.alg, 'num_learning_epochs', 'N/A')}")
-        print(f"num_mini_batches: {getattr(self.alg, 'num_mini_batches', 'N/A')}")
-        print(f"---------------------------------\n")
 
         # === Randomize episode starts (optional) ===
         if init_at_random_ep_len:
@@ -427,9 +415,11 @@ class DPMMRunnerConditioned(OnPolicyRunner):
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
-        # one temporary trajectory per env
+        # one temporary trajectory per env (for DPMM-VAE buffer, record finished trajectories and get appended to buffer)
         self._dpmm_trajs = [[] for _ in range(self.env.num_envs)]
-        prev_obs = obs.clone()  # save as "s" in first tuple (s,a,r,s')
+
+        # save as "s" in first tuple (s,a,r,s')
+        prev_obs = obs.clone()  
 
         # === Training loop ===
         start_iter = self.current_learning_iteration
@@ -440,15 +430,13 @@ class DPMMRunnerConditioned(OnPolicyRunner):
             # === Collect rollouts ===
             with torch.inference_mode():
 
-                # first todo for conditioned PPO: inject latent z to PPO before rollout
-
-                z, assignments = self.encoder(
-                    self.context_buffer)  # we dont need to clone() the buffer, since we use torch.inference_mode()
-                #self.alg.set_latent(z)  # now pi(. |z)
+               
+                # 1. Condition PPO on latent encoding z before doing rollouts: sample z
+                z, assignments = self.encoder(self.context_buffer)  # TODO check if normalization for z needed
 
                 for _ in range(self.num_steps_per_env):
-
-                    # append latent z every step to obs, so pi(a|s) => pi(a|s,z)
+                    
+                    # append current latent z every step to obs, so pi(a|s) => pi(a|s,z)
                     obs_z = torch.cat([obs, z], dim=-1)  # now combine with the latent encoding z
                     privileged_obs_z = torch.cat([privileged_obs, z], dim=-1)
 
@@ -459,7 +447,7 @@ class DPMMRunnerConditioned(OnPolicyRunner):
                     obs, rewards, dones, infos = self.env.step(actions.to(self.env.device))
                     obs, rewards, dones = obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
-                    # for PPO inferring the DPMM-VAE later: remeber last (context_length)-transitions:
+                    # for computing next latent z next PPO iter: remeber last len(context)-transitions:
                     transition_context = torch.cat(
                         [
                             prev_obs,  # [N, Ds]
@@ -476,7 +464,7 @@ class DPMMRunnerConditioned(OnPolicyRunner):
                     # for DPMM Buffer: append for i-th env the i-th (s,a,r,s') tuple each step
                     # first check if new subenvs should be sampled from tasks
                     # TODO flush remaining trajectories or set _dpm_trajs list empty when resetting
-                    if self.dpmm_total_update_steps % self.dpmm_cfg.reselect_envs_interval == 0:
+                    if self.dpmm_buffer_total_update_steps % self.dpmm_cfg.reselect_envs_interval == 0:
                         self.dpmm_selected_sample_envs = self.select_random_envs()
 
                     next_obs = obs.clone()
@@ -530,7 +518,7 @@ class DPMMRunnerConditioned(OnPolicyRunner):
                         cur_episode_length[done_ids] = 0
 
                     # increment timesteps collected in env
-                    self.dpmm_total_update_steps += 1
+                    self.dpmm_buffer_total_update_steps += 1
 
                 collection_time = time.time() - start_time
 
@@ -538,30 +526,14 @@ class DPMMRunnerConditioned(OnPolicyRunner):
                 if self.training_type == "rl":
                     self.alg.compute_returns(privileged_obs_z)
 
-            # log DPMM-buffer statistics
+            # log DPMM-VAE buffer statistics
             if len(self.dpmm_buffer) > 0:
-                print(f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)} | "
-                      f"last_reward={self.dpmm_buffer.buffer[-1].reward} | "
-                      f"done={self.dpmm_buffer.buffer[-1].done}")
-                print("dpmm total update steps", self.dpmm_total_update_steps)
-                #done_count = sum(t.done for t in self.dpmm_buffer.buffer)
-                #print(f"DPMM done ratio = {done_count / len(self.dpmm_buffer.buffer)}")
-                #print(f"DPMM done count = {done_count}")
+                print(f"[DPMM Buffer] size={len(self.dpmm_buffer.buffer)}")
+                print("dpmm buffer total update steps", self.dpmm_buffer_total_update_steps)
+                
 
-            # DPMM-VAE training update:
-
-            # sample batch from DPMM-Buffer according strategy Sc and pass sequentially to GRU:
-            #batch_dpmm = self.dpmm_buffer.sample_contexts(batch_size=self.dpmm_cfg.batch_size,nw=self.dpmm_cfg.context_length)
-
-            # update VAE's KL beta
-            if len(self.dpmm_buffer
-                   ) > self.dpmm_cfg.context_length and it > 0 and it % 1 == 0:  # training disabled for now
-
-                vae_beta = min(self.dpmm_cfg.warmup.beta_final,
-                               self.dpmm_cfg.warmup.beta_final * it / self.dpmm_cfg.warmup.warmup_epochs)
-                self.dpmm_trainer.alpha_kl_z = vae_beta
-
-                self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+            # Run DPMM-VAE training update:
+            self.run_dpmm_vae_update(current_ppo_iter=it, num_vae_epochs=self.dpmm_cfg.trainer.dpmm_vae_num_epochs)
 
             # === PPO update ===
             start_update = time.time()
@@ -580,3 +552,45 @@ class DPMMRunnerConditioned(OnPolicyRunner):
         # === Final save ===
         if self.log_dir is not None and not self.disable_logs:
             self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+
+
+    def run_dpmm_vae_update(self, current_ppo_iter, num_vae_epochs=1):
+        """
+        Update VAE KL beta and run DPMM-VAE training steps if conditions are met.
+
+        Args:
+            current_ppo_iter (int): Current PPO iteration.
+            num_vae_epochs (int): Number of VAE updates to run.
+        """
+
+        # define DPMM-VAE training condition # TODO define a potentially better condition
+        training_schedule_condition = (
+            len(self.dpmm_buffer) > self.dpmm_cfg.context_length  # 1. buffer has enough transitions for one context
+            and self.dpmm_cfg.trainer.dpmm_vae_start_iter_delay > current_ppo_iter # wait some ppo iterations first
+            and current_ppo_iter % self.dpmm_cfg.trainer.skip_num_ppo_iter == 0 # dont train the VAE every ppo iteration, only every n PPO iterations
+        )
+
+        if training_schedule_condition:
+            print("Begin training DPMM-VAE...")
+
+            beta_final = self.dpmm_cfg.warmup.beta_final
+            warmup_epochs = self.dpmm_cfg.warmup.warmup_epochs
+
+            for vae_iter in range(num_vae_epochs):
+
+                # Compute warmup-scaled KL beta
+                vae_beta = min(
+                    beta_final,
+                    beta_final * self.dpmm_vae_total_updates / warmup_epochs
+                )
+
+                # Update trainer KL weight
+                self.dpmm_trainer.alpha_kl_z = vae_beta
+
+                # Run DPMM-VAE training step
+                self.dpmm_trainer.train(
+                    mixture_steps=self.dpmm_cfg.trainer.mixture_steps,
+                    current_epoch=self.dpmm_vae_total_updates,
+                )
+
+                self.dpmm_vae_total_updates += 1
