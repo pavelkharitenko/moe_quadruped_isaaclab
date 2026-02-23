@@ -1,0 +1,9 @@
+{
+    "epoch": 112,
+    "perplexity": 30.0,
+    "num_samples": 500,
+    "num_tasks": 3,
+    "num_clusters": 3,
+    "ARI": 0.1471990233564859,
+    "NMI": 0.1787401608797785
+}

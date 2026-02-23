@@ -1,0 +1,71 @@
+--- git status ---
+On branch moe_quadruped
+Your branch is up to date with 'origin/moe_quadruped'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   scripts/moe_quadruped/make_final_plots.py
+	modified:   source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/lowcrawl_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	FastTD3/
+ 
+
+
+--- git diff ---
+diff --git a/scripts/moe_quadruped/make_final_plots.py b/scripts/moe_quadruped/make_final_plots.py
+index 97b6cb9fed..25f74db49c 100644
+--- a/scripts/moe_quadruped/make_final_plots.py
++++ b/scripts/moe_quadruped/make_final_plots.py
+@@ -22,9 +22,9 @@ experiments = {
+     r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_15-38-34_run_legstand_final_12",
+     ],
+     "Task 4: Crawl": [
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_07-10-54_run_flatvel_final_53",
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-04-53_run_flatvel_final_449",
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-44-56_run_flatvel_final_12",
++    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_16-59-34_run_lowcrawl_final_52",
++    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_17-58-21_run_lowcrawl_final_449",
++    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_18-59-17_run_lowcrawl_final_12",
+     ],
+ }
+ 
+diff --git a/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/lowcrawl_env_cfg.py b/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/lowcrawl_env_cfg.py
+index 0557291977..c0d9885de3 100644
+--- a/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/lowcrawl_env_cfg.py
++++ b/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion_multitask/velocity/config/go2_mt/lowcrawl_env_cfg.py
+@@ -18,24 +18,24 @@ class UnitreeGo2LowCrawlEnvCfg(UnitreeGo2FlatEnvCfg):
+         super().__post_init__()
+ 
+         # disable incompatible rewards
+-        self.rewards.feet_air_time.weight = 0.25  # default hopping reward
++        self.rewards.feet_air_time.weight = 0.125  # default hopping reward
+         self.rewards.flat_orientation_l2.weight = 0.0
+ 
+         # disable reset on base touching the ground
+         #self.terminations.base_contact = None
+ 
+         # velocity tracking
+-        self.rewards.track_lin_vel_xy_exp.weight = 2.0
+-        self.rewards.track_ang_vel_z_exp.weight = 1.0
++        self.rewards.track_lin_vel_xy_exp.weight = 1.0
++        self.rewards.track_ang_vel_z_exp.weight = 0.5
+ 
+-        self.rewards.lin_vel_z_l2.weight = -2.0
+-        self.rewards.ang_vel_xy_l2.weight = -0.5
++        self.rewards.lin_vel_z_l2.weight = -1.0
++        self.rewards.ang_vel_xy_l2.weight = -0.25
+ 
+         # low-crawl specific shaping
+-        self.rewards.base_height.weight = 0.4
+-        self.rewards.feet_clearance.weight = 0.2
+-        self.rewards.feet_contact_fraction.weight = 0.1  #1.0
+-        self.rewards.posture_orientation.weight = 0.25
++        self.rewards.base_height.weight = 0.2
++        self.rewards.feet_clearance.weight = 0.1
++        self.rewards.feet_contact_fraction.weight = 0.05  #1.0
++        self.rewards.posture_orientation.weight = 0.125
+ 
+         # terminations
+         self.terminations.base_contact.params["sensor_cfg"].body_names = ["Head_lower", "Head_upper", "base"]

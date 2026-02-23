@@ -1,0 +1,165 @@
+--- git status ---
+On branch moe_quadruped
+Your branch is up to date with 'origin/moe_quadruped'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   scripts/moe_quadruped/plotting_scripts/make_final_plots_MT_PPO.py
+	modified:   scripts/moe_quadruped/plotting_scripts/make_final_plots_MoE_analysis.py
+	modified:   source/isaaclab_rl/isaaclab_rl/rsl_rl/rsl_moe.py
+	modified:   source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/legstand_rewards.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	FastTD3/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/scripts/moe_quadruped/plotting_scripts/make_final_plots_MT_PPO.py b/scripts/moe_quadruped/plotting_scripts/make_final_plots_MT_PPO.py
+index 251ab52607..0063bff2f9 100644
+--- a/scripts/moe_quadruped/plotting_scripts/make_final_plots_MT_PPO.py
++++ b/scripts/moe_quadruped/plotting_scripts/make_final_plots_MT_PPO.py
+@@ -7,12 +7,13 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
+ # Multitask runs (different seeds)
+ # ------------------------------------------------------------------
+ run_dirs = [
++    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-08_10-49-51_run_multitask_final_ppo_52",
+     #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_09-30-23_run_multitask_exp_ppo_449",
+     #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_14-03-44_run_multitask_final_ppo_12"
+     
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
+-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52",
++    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52", # this one used for moe analysis
++    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
++    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
+ ]
+ 
+ # ------------------------------------------------------------------
+@@ -141,7 +142,8 @@ ax.fill_between(
+ ax.set_ylabel("Episode Return", fontsize=10)
+ ax.tick_params(axis="both", labelsize=10)
+ ax.grid(True)
+-ax.legend(fontsize=9)
++ax.legend(fontsize=9, loc="lower right")
++ax.set_ylim(top=40.25)
+ 
+ # ==============================
+ # Bottom: Per-task rewards
+diff --git a/scripts/moe_quadruped/plotting_scripts/make_final_plots_MoE_analysis.py b/scripts/moe_quadruped/plotting_scripts/make_final_plots_MoE_analysis.py
+index 4a50f7e795..0831e6b4f9 100644
+--- a/scripts/moe_quadruped/plotting_scripts/make_final_plots_MoE_analysis.py
++++ b/scripts/moe_quadruped/plotting_scripts/make_final_plots_MoE_analysis.py
+@@ -6,7 +6,7 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
+ # -------------------------------
+ # Path to your TensorBoard log directory
+ # -------------------------------
+-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe"
++log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52"
+ 
+ # -------------------------------
+ # Metrics to plot
+@@ -88,7 +88,7 @@ from mpl_toolkits.mplot3d import Axes3D
+ # -------------------------------
+ # CONFIGURATION
+ # -------------------------------
+-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe\gating_weights"
++log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52\gating_weights"
+ num_tasks = 4
+ num_experts = 4
+ bins = np.linspace(0, 1, 21)  # histogram bins for weights
+@@ -207,7 +207,7 @@ import matplotlib.pyplot as plt
+ # -------------------------------
+ # CONFIGURATION
+ # -------------------------------
+-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_16-58-42_run_multitask_exp_moe\gating_weights"
++log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52\gating_weights"
+ 
+ task_to_plot = 0   # e.g., Task 0
+ num_experts = 4
+diff --git a/source/isaaclab_rl/isaaclab_rl/rsl_rl/rsl_moe.py b/source/isaaclab_rl/isaaclab_rl/rsl_rl/rsl_moe.py
+index 55f5a84195..dd8a24c087 100644
+--- a/source/isaaclab_rl/isaaclab_rl/rsl_rl/rsl_moe.py
++++ b/source/isaaclab_rl/isaaclab_rl/rsl_rl/rsl_moe.py
+@@ -485,18 +485,13 @@ class MyOnPolicyRunner(OnPolicyRunner):
+ 
+     def _log_moe_diagnostics(self, obs: torch.Tensor, num_tasks=4):
+         """
+-        Logging function for MoE statistics, if not running MoE, can be ignored or removed
+-        
+-        :param self: Description
+-        :param obs: Description
++        Logging function for MoE statistics, if not running MoE, can be ignored or removed.
++        Adds storage of raw gating weights for offline plotting/histogram analysis.
++
++        :param obs: observations tensor
+         :type obs: torch.Tensor
+-        :param num_tasks: provide for logging the true task number
++        :param num_tasks: number of tasks
+         """
+-
+-        if self.current_learning_iteration % 20 != 0:
+-            return  # skip logging for other iterations
+-
+-
+         policy = self.alg.policy
+ 
+         if not hasattr(policy, "num_experts"):
+@@ -511,7 +506,11 @@ class MyOnPolicyRunner(OnPolicyRunner):
+ 
+         with torch.no_grad():
+             # subsample for speed + stability
+-            obs = obs[: min(2048, obs.shape[0])]
++            B = obs.shape[0]
++            n = min(2048, B)
++            idx = torch.randperm(B, device=obs.device)[:n]
++            obs = obs[idx]
++
+ 
+             # ---- gating ----
+             gating_logits = policy.gating_network(obs)
+@@ -547,6 +546,10 @@ class MyOnPolicyRunner(OnPolicyRunner):
+             # =====================================================
+             task_one_hot = obs[:, -num_tasks:]
+             task_ids = torch.argmax(task_one_hot, dim=-1)
++            print("333333333333333333333333333333333333333333333333")
++            print("333333333333333333333333333333333333333333333333")
++            print("333333333333333333333333333333333333333333333333")
++            print("TASK IDS registered:", task_ids)
+ 
+             for t in torch.unique(task_ids):
+                 mask = task_ids == t
+@@ -583,4 +586,4 @@ class MyOnPolicyRunner(OnPolicyRunner):
+             print(
+                 "[MoE] mean expert weights:",
+                 ", ".join(f"{w:.2f}" for w in mean_weights.tolist())
+-            )
+\ No newline at end of file
++            )
+diff --git a/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/legstand_rewards.py b/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/legstand_rewards.py
+index cd7edb3ac0..27ba7bfbdf 100644
+--- a/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/legstand_rewards.py
++++ b/source/isaaclab_tasks/isaaclab_tasks/manager_based/locomotion/velocity/config/go2_moe/legstand_rewards.py
+@@ -77,18 +77,7 @@ def legstand_base_contact_penalty(
+     return -torch.clamp(contact, min=0.0, max=100.0).sum(dim=1) / 100.0
+ 
+ 
+-"""
+-def legstand_joint_limit_penalty(
+-    env: ManagerBasedRLEnv,
+-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+-) -> torch.Tensor:
+-    #Penalize joint positions being close to or beyond their limits.
+-    asset: RigidObject = env.scene[asset_cfg.name]
+-    dof_mid = (asset.data.soft_joint_pos_limits[:, 0] + asset.data.soft_joint_pos_limits[:, 1]) * 0.5
+-    dof_range = (asset.data.soft_joint_pos_limits[:, 1] - asset.data.soft_joint_pos_limits[:, 0]) * 0.5
+-    distance = torch.abs(asset.data.joint_pos - dof_mid) / (dof_range + 1e-6)
+-    return torch.sum(distance ** 5, dim=1) / asset.num_dof
+-"""
++
+ 
+ 
+ def legstand_drift_penalty(
