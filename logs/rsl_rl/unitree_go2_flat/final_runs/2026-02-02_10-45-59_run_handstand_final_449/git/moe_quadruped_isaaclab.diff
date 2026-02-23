@@ -1,0 +1,39 @@
+--- git status ---
+On branch moe_quadruped
+Your branch is up to date with 'origin/moe_quadruped'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   source/isaaclab_rl/isaaclab_rl/rsl_rl/DPMM/dpmm_runner_bnpy.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	FastTD3/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/source/isaaclab_rl/isaaclab_rl/rsl_rl/DPMM/dpmm_runner_bnpy.py b/source/isaaclab_rl/isaaclab_rl/rsl_rl/DPMM/dpmm_runner_bnpy.py
+index dd6bfcc7..4ad90d0c 100644
+--- a/source/isaaclab_rl/isaaclab_rl/rsl_rl/DPMM/dpmm_runner_bnpy.py
++++ b/source/isaaclab_rl/isaaclab_rl/rsl_rl/DPMM/dpmm_runner_bnpy.py
+@@ -518,9 +518,6 @@ class DPMMRunner(OnPolicyRunner):
+ 
+                 self.dpmm_trainer.train(mixture_steps=self.dpmm_cfg.trainer.mixture_steps, current_epoch=it)
+ 
+-
+-
+-
+             # === PPO update ===
+             start_update = time.time()
+             loss_dict = self.alg.update()
+@@ -538,7 +535,3 @@ class DPMMRunner(OnPolicyRunner):
+         # === Final save ===
+         if self.log_dir is not None and not self.disable_logs:
+             self.save(os.path.join(self.log_dir, f"model_{self.current_learning_iteration}.pt"))
+-
+-
+-
+-
