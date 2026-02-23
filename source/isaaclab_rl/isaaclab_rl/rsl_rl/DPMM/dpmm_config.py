@@ -31,7 +31,7 @@ class DpmmVaeCfgBnpy:
     context_length = 24
     dpmm_buffer_size = 100_000
     max_traj_len = 1000
-    batch_size = 256  
+    batch_size = 256
 
     # Encoder & Decoder
     time_steps = 23  # context_length to encoder, its (contex_length-1) of buffer
@@ -68,11 +68,10 @@ class DpmmVaeCfgBnpy:
 
     # Training
     class trainer:
-        
-        dpmm_vae_start_iter_delay = 100 # train 100 PPO iterations first, to not train on noisy trajectories
-        dpmm_vae_num_epochs = 1 # how many epochs to train VAE when training schedule met
-        skip_num_ppo_iter = 4 # train only every n PPO iteratiosn
 
+        dpmm_vae_start_iter_delay = 0  # train 100 PPO iter first before training DPMM-VAE, to not train on noisy trajectories
+        dpmm_vae_num_epochs = 1  # how many epochs to train VAE when training schedule met
+        skip_num_ppo_iter = 4  # train only every n PPO iteratiosn
 
         batch_size_rollout = 256  #256
         lr_decoder = 3e-4
