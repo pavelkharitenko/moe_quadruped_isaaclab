@@ -2,18 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-
 # ------------------------------------------------------------------
 # Multitask runs (different seeds)
 # ------------------------------------------------------------------
 run_dirs = [
-    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-08_10-49-51_run_multitask_final_ppo_52",
-    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_09-30-23_run_multitask_exp_ppo_449",
-    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-04_14-03-44_run_multitask_final_ppo_12"
-    
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52", # this one used for moe analysis
-    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
-    #r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
+    #r"logs\rsl_rl\unitree_go2_multitask\2026-02-08_10-49-51_run_multitask_final_ppo_52",
+    #r"logs\rsl_rl\unitree_go2_multitask\2026-02-04_09-30-23_run_multitask_exp_ppo_449",
+    #r"logs\rsl_rl\unitree_go2_multitask\2026-02-04_14-03-44_run_multitask_final_ppo_12"
+    r"logs\rsl_rl\unitree_go2_multitask\2026-02-07_07-55-31_run_multitask_final_moe_52",  # this one used for moe analysis
+    #r"logs\rsl_rl\unitree_go2_multitask\2026-02-05_17-28-18_run_multitask_final_moe_449",
+    #r"logs\rsl_rl\unitree_go2_multitask\2026-02-06_08-29-39_run_multitask_final_moe_12",
 ]
 
 # ------------------------------------------------------------------
@@ -29,16 +27,16 @@ task_tags = {
 }
 
 seaborn_colors = {
-    "blue":   "#4C72B0",
+    "blue": "#4C72B0",
     "orange": "#DD8452",
-    "green":  "#55A868",
-    "red":    "#C44E52",
+    "green": "#55A868",
+    "red": "#C44E52",
     "purple": "#8172B2",
-    "brown":  "#937860",
-    "pink":   "#DA8BC3",
-    "gray":   "#8C8C8C",
+    "brown": "#937860",
+    "pink": "#DA8BC3",
+    "gray": "#8C8C8C",
     "yellow": "#CCB974",
-    "cyan":   "#64B5CD",
+    "cyan": "#64B5CD",
 }
 
 task_colors = {
@@ -47,6 +45,7 @@ task_colors = {
     "Legstand": "#DD8452",
     "Crawl": "#8172B2",
 }
+
 
 # ------------------------------------------------------------------
 # Helpers
@@ -62,6 +61,7 @@ def forward_fill_nan(x):
             last = v
     return np.array(out)
 
+
 def running_average(x, window=40):
     if window <= 1:
         return x
@@ -72,7 +72,6 @@ def running_average(x, window=40):
     smoothed = np.convolve(x_padded, kernel, mode="valid")
 
     return smoothed[:len(x)]
-
 
 
 # ------------------------------------------------------------------
@@ -120,7 +119,7 @@ overall_mean = np.mean(all_overall, axis=0)
 overall_std = np.std(all_overall, axis=0)
 
 task_mean = {k: np.mean(v, axis=0) for k, v in all_tasks.items()}
-task_std  = {k: np.std(v, axis=0)  for k, v in all_tasks.items()}
+task_std = {k: np.std(v, axis=0) for k, v in all_tasks.items()}
 
 # ------------------------------------------------------------------
 # Plot: 2x1 layout

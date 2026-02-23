@@ -6,7 +6,7 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 # -------------------------------
 # Path to your TensorBoard log directory
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52"
 
 # -------------------------------
 # Metrics to plot

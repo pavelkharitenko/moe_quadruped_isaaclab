@@ -8,7 +8,7 @@ from matplotlib.colors import Normalize
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
 
 num_tasks = 4
 num_experts = 4
@@ -34,14 +34,12 @@ task_titles = [
 cmap = cm.viridis
 norm = Normalize(vmin=0.0, vmax=0.7)
 
-
-
 # -------------------------------
 # LOOP OVER TASKS
 # -------------------------------
 for t, ax in enumerate(axes):
     files = sorted(glob.glob(os.path.join(log_dir, f"task_{t}_iter_*.npz")))
-    
+
     if len(files) == 0:
         print(f"No data found for task {t}")
         continue
@@ -82,8 +80,6 @@ cbar = fig.colorbar(sm, cax=cax)
 #cbar.set_label("Mean Weight", fontsize=10)
 cbar.ax.tick_params(labelsize=10)
 
-
-
 import os
 import glob
 import numpy as np
@@ -94,7 +90,7 @@ from matplotlib.colors import Normalize
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
 
 num_tasks = 4
 num_experts = 4
@@ -134,8 +130,8 @@ for t in range(num_tasks):
         all_weights.append(data)
     all_weights = np.concatenate(all_weights, axis=0)
 
-    var_weights = all_weights.var(axis=0)          # variance per expert
-    std_weights = np.sqrt(var_weights)             # std deviation σ
+    var_weights = all_weights.var(axis=0)  # variance per expert
+    std_weights = np.sqrt(var_weights)  # std deviation σ
     all_std.append(std_weights)
 
 # Global max σ across all tasks for color scaling
@@ -195,7 +191,4 @@ cbar.ax.tick_params(labelsize=10)
 
 plt.show()
 
-
-
 plt.show()
-

@@ -2,11 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+import os
+import glob
+import numpy as np
+import matplotlib.pyplot as plt
 
 # -------------------------------
 # Path to your TensorBoard log directory
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52"
 
 # -------------------------------
 # Metrics to plot
@@ -75,9 +79,6 @@ for t in range(2):  # tasks 0 and 1 in subplot axes[2] and axes[3], extend as ne
 
 plt.tight_layout(rect=[0, 0, 1, 0.95])
 
-
-
-
 import os
 import glob
 import numpy as np
@@ -88,7 +89,7 @@ from mpl_toolkits.mplot3d import Axes3D
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-48-51_run_multitask_analysis_moe_52\gating_weights"
 num_tasks = 4
 num_experts = 4
 bins = np.linspace(0, 1, 21)  # histogram bins for weights
@@ -97,7 +98,7 @@ bins = np.linspace(0, 1, 21)  # histogram bins for weights
 # PLOT SETUP
 # -------------------------------
 fig = plt.figure(figsize=(16, 12), dpi=300)
-axes = [fig.add_subplot(2, 2, i+1, projection='3d') for i in range(num_tasks)]
+axes = [fig.add_subplot(2, 2, i + 1, projection='3d') for i in range(num_tasks)]
 task_names = [f"Task {t}" for t in range(num_tasks)]
 
 # -------------------------------
@@ -141,18 +142,17 @@ for t, ax in enumerate(axes):
     ax.set_ylabel("Weight Bin", fontsize=10)
     ax.set_zlabel("Count", fontsize=10)
     ax.set_xticks(range(num_experts))
-    ax.set_yticks(range(len(bins)-1))
+    ax.set_yticks(range(len(bins) - 1))
     ax.set_yticklabels([f"{b:.2f}" for b in bins[:-1]], fontsize=8)
     ax.tick_params(axis='x', labelsize=9)
     ax.tick_params(axis='z', labelsize=9)
 
 plt.tight_layout()
 
-
 # -------------------------------
 # PLOT 3D HISTOGRAMS FOR LAST ITERATION
 # -------------------------------
-fig_last, axes_last = plt.subplots(2, 2, figsize=(16, 12), dpi=300, subplot_kw={'projection':'3d'})
+fig_last, axes_last = plt.subplots(2, 2, figsize=(16, 12), dpi=300, subplot_kw={'projection': '3d'})
 axes_last = axes_last.flatten()
 
 for t, ax in enumerate(axes_last):
@@ -189,7 +189,7 @@ for t, ax in enumerate(axes_last):
     ax.set_ylabel("Weight Bin", fontsize=10)
     ax.set_zlabel("Count", fontsize=10)
     ax.set_xticks(range(num_experts))
-    ax.set_yticks(range(len(bins)-1))
+    ax.set_yticks(range(len(bins) - 1))
     ax.set_yticklabels([f"{b:.2f}" for b in bins[:-1]], fontsize=8)
     ax.tick_params(axis='x', labelsize=9)
     ax.tick_params(axis='z', labelsize=9)
@@ -197,19 +197,12 @@ for t, ax in enumerate(axes_last):
 plt.tight_layout()
 plt.show()
 
-
-
-import os
-import glob
-import numpy as np
-import matplotlib.pyplot as plt
-
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-log_dir = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52\gating_weights"
+log_dir = r"logs\rsl_rl\unitree_go2_multitask\2026-02-10_10-36-56_run_multitask_analysis_52\gating_weights"
 
-task_to_plot = 0   # e.g., Task 0
+task_to_plot = 0  # e.g., Task 0
 num_experts = 4
 
 # -------------------------------
@@ -228,7 +221,7 @@ for f in files:
     iterations.append(iter_num)
 
     data = np.load(f)['task_weights']  # [num_samples_for_task, num_experts]
-    mean_weights = data.mean(axis=0)    # mean per expert
+    mean_weights = data.mean(axis=0)  # mean per expert
     mean_weights_per_expert.append(mean_weights)
 
 iterations = np.array(iterations)
@@ -249,4 +242,3 @@ plt.grid(True, linestyle='--', alpha=0.5)
 plt.legend(fontsize=10)
 plt.tight_layout()
 plt.show()
-

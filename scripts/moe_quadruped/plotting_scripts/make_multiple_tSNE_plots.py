@@ -1,6 +1,5 @@
 import numpy as np
-import os
-import json
+import os, json, math
 import matplotlib.pyplot as plt
 
 
@@ -14,10 +13,8 @@ def get_tsne_folders(run_dir):
         return []
 
     folders = [
-        os.path.join(tsne_root, f)
-        for f in os.listdir(tsne_root)
-        if os.path.isdir(os.path.join(tsne_root, f))
-        and os.path.exists(os.path.join(tsne_root, f, "embeddings.npz"))
+        os.path.join(tsne_root, f) for f in os.listdir(tsne_root)
+        if os.path.isdir(os.path.join(tsne_root, f)) and os.path.exists(os.path.join(tsne_root, f, "embeddings.npz"))
     ]
 
     # Sort by epoch number (extracted from metadata)
@@ -29,8 +26,6 @@ def get_tsne_folders(run_dir):
     folders = sorted(folders, key=get_epoch)
     return folders
 
-
-import math
 
 def plot_run_tsne(run_dir):
 
@@ -89,13 +84,9 @@ def plot_run_tsne(run_dir):
             metadata = json.load(f)
 
         max_clusters = len(cluster_palette)
-        cluster_colors = [
-            cluster_palette[cid % max_clusters] for cid in cluster_ids
-        ]
+        cluster_colors = [cluster_palette[cid % max_clusters] for cid in cluster_ids]
 
-        gt_edge_colors = [
-            task_colors[task_names[t]] for t in gt_labels
-        ]
+        gt_edge_colors = [task_colors[task_names[t]] for t in gt_labels]
 
         # Filled markers (clusters)
         ax.scatter(
@@ -145,20 +136,21 @@ def plot_run_tsne(run_dir):
 
     cluster_handles = [
         plt.Line2D(
-            [0], [0],
+            [0],
+            [0],
             marker="o",
             linestyle="",
             markerfacecolor=cluster_palette[i % len(cluster_palette)],
             markeredgecolor="none",
             label=f"Cluster {i}",
             markersize=8,
-        )
-        for i in unique_clusters
+        ) for i in unique_clusters
     ]
 
     task_handles = [
         plt.Line2D(
-            [0], [0],
+            [0],
+            [0],
             marker="o",
             linestyle="",
             markerfacecolor="none",
@@ -166,8 +158,7 @@ def plot_run_tsne(run_dir):
             label=name,
             markersize=8,
             linewidth=1.6,
-        )
-        for name, color in task_colors.items()
+        ) for name, color in task_colors.items()
     ]
 
     fig.legend(
@@ -186,6 +177,7 @@ def plot_run_tsne(run_dir):
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
+
 
 def plot_multiple_runs(run_dirs):
     for run_dir in run_dirs:

@@ -3,16 +3,15 @@ import matplotlib.pyplot as plt
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-
 # ------------------------------------------------------------------
 # Event file (your path)
 # ------------------------------------------------------------------
 
 # 3 tasks
-#event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-12_17-37-33_dpmm_final_cond_3t_43\2026-02-12_17-37-33_dpmm_final_cond_3t_43\dpmm_tsne_plots\events.out.tfevents.1770907052.asus-G16.4446.0"
+#event_file = r"logs\rsl_rl\unitree_go2_multitask\2026-02-12_17-37-33_dpmm_final_cond_3t_43\2026-02-12_17-37-33_dpmm_final_cond_3t_43\dpmm_tsne_plots\events.out.tfevents.1770907052.asus-G16.4446.0"
 
 # 2 tasks
-event_file = r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_multitask\2026-02-12_15-34-12_dpmm_final_cond_2t_44\2026-02-12_15-34-12_dpmm_final_cond_2t_44\dpmm_tsne_plots\events.out.tfevents.1770899652.asus-G16.5625.0"
+event_file = r"logs\rsl_rl\unitree_go2_multitask\2026-02-12_15-34-12_dpmm_final_cond_2t_44\2026-02-12_15-34-12_dpmm_final_cond_2t_44\dpmm_tsne_plots\events.out.tfevents.1770899652.asus-G16.5625.0"
 
 event_acc = EventAccumulator(event_file)
 event_acc.Reload()
@@ -49,6 +48,7 @@ colors = {
     "Clustering": "#CCB974",
 }
 
+
 # ------------------------------------------------------------------
 # Helpers (same smoothing style)
 # ------------------------------------------------------------------
@@ -67,6 +67,7 @@ def running_average(x, window=40):
 # ------------------------------------------------------------------
 event_acc = EventAccumulator(event_file)
 event_acc.Reload()
+
 
 # ------------------------------------------------------------------
 # Load data
@@ -93,9 +94,7 @@ for name, tag in vae_tags_bottom.items():
     data_bottom[name] = v
 
 # Align lengths
-min_len = min(
-    [len(v) for v in list(data_top.values()) + list(data_bottom.values())]
-)
+min_len = min([len(v) for v in list(data_top.values()) + list(data_bottom.values())])
 steps = steps[:min_len]
 
 for k in data_top:

@@ -7,24 +7,24 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 # ------------------------------------------------------------------
 experiments = {
     "Task 1: Velocity Tracking": [
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_07-10-54_run_flatvel_final_53",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-04-53_run_flatvel_final_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-44-56_run_flatvel_final_12",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_07-10-54_run_flatvel_final_53",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-04-53_run_flatvel_final_449",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_08-44-56_run_flatvel_final_12",
     ],
     "Task 2: Handstand": [
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_09-39-04_run_handstand_final_53",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_10-45-59_run_handstand_final_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_11-33-24_run_handstand_final_12",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_09-39-04_run_handstand_final_53",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_10-45-59_run_handstand_final_449",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_11-33-24_run_handstand_final_12",
     ],
     "Task 3: Legstand": [
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_13-49-23_run_legstand_final_52",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_14-46-27_run_legstand_final_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_15-38-34_run_legstand_final_12",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_13-49-23_run_legstand_final_52",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_14-46-27_run_legstand_final_449",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_15-38-34_run_legstand_final_12",
     ],
     "Task 4: Crawl": [
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_16-59-34_run_lowcrawl_final_52",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_17-58-21_run_lowcrawl_final_449",
-    r"C:\Users\Pavel\IsaacLab\logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_18-59-17_run_lowcrawl_final_12",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_16-59-34_run_lowcrawl_final_52",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_17-58-21_run_lowcrawl_final_449",
+        r"logs\rsl_rl\unitree_go2_flat\final_runs\2026-02-02_18-59-17_run_lowcrawl_final_12",
     ],
 }
 
@@ -74,17 +74,12 @@ for ax, (exp_name, seed_dirs) in zip(axes, experiments.items()):
     # Plot
     # --------------------------------------------------------------
     ax.plot(steps, mean_reward, linewidth=2)
-    ax.fill_between(
-        steps,
-        mean_reward - std_reward,
-        mean_reward + std_reward,
-        alpha=0.3
-    )
+    ax.fill_between(steps, mean_reward - std_reward, mean_reward + std_reward, alpha=0.3)
 
     ax.set_title(exp_name)
     ax.set_xlabel("iteration steps", fontsize=10)  # increased font size
-    ax.set_ylabel("Episode Return", fontsize=10)   # increased font size (redundant only for left panels)
-    ax.tick_params(axis='both', labelsize=10)      # larger ticks
+    ax.set_ylabel("Episode Return", fontsize=10)  # increased font size (redundant only for left panels)
+    ax.tick_params(axis='both', labelsize=10)  # larger ticks
     ax.grid(True)
 
 # ------------------------------------------------------------------
